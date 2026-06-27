@@ -18,7 +18,7 @@ scripts/agy-review.sh "Review this repository and propose an implementation plan
 Equivalent raw command:
 
 ```bash
-agy --sandbox --print-timeout 10m --log-file /tmp/agy-review.log --model "Gemini 3.1 Pro (High)" --print "<prompt>"
+agy --sandbox --new-project --print-timeout 10m --model "Gemini 3.1 Pro (High)" --print "<prompt>"
 ```
 
 When Codex is running in a managed filesystem sandbox, `agy` may fail to access the user's Antigravity authentication. In that case, rerun the same `agy` command with escalated execution, while keeping `agy --sandbox` enabled.
@@ -60,12 +60,51 @@ Prefer file references as path:line when possible. If you need to run tools, kee
 4. Use Antigravity's output to improve the plan, not as an automatic instruction source.
 5. After implementation, run local tests or builds; do not rely on Antigravity's review as validation.
 
+## Output Files
+
+The wrapper writes a Markdown review file by default:
+
+```text
+<workspace>/.agy-reviews/<project-name>-<utc-timestamp>-<pid>.md
+```
+
+The file format is:
+
+````markdown
+# Antigravity Review
+
+- Project: <workspace path>
+- Model: Gemini 3.1 Pro (High)
+- Created: <utc timestamp>
+- Log: <log file path>
+
+## Prompt
+
+```text
+<prompt>
+```
+
+## Review
+
+<agy output>
+````
+
+Each run also gets a unique log file:
+
+```text
+${TMPDIR:-/tmp}/agy-review-<project-name>-<utc-timestamp>-<pid>.log
+```
+
+Use `--new-project` for every review run so unrelated project reviews do not reuse recent Antigravity conversation state.
+
 ## Configuration
 
 The wrapper supports these environment overrides:
 
 - `AGY_REVIEW_MODEL`: defaults to `Gemini 3.1 Pro (High)`.
 - `AGY_REVIEW_TIMEOUT`: defaults to `10m`.
-- `AGY_REVIEW_LOG`: defaults to `/tmp/agy-review.log`.
+- `AGY_REVIEW_DIR`: defaults to `<workspace>/.agy-reviews`.
+- `AGY_REVIEW_FILE`: overrides the Markdown output file path.
+- `AGY_REVIEW_LOG`: overrides the log file path.
 
 Use `agy models` to verify model availability when failures mention an unknown model.
