@@ -1,0 +1,4 @@
+interface:
+  display_name: "Antigravity Review Planner"
+  short_description: "Sandboxed AGY review and planning"
+  default_prompt: "Use $antigravity-review-planner to get an independent review and implementation plan."
