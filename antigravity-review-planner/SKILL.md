@@ -62,6 +62,9 @@ Task: <user task>
 Known local context:
 <brief codegraph or rg findings>
 
+Review target files:
+<file paths or "not provided">
+
 Focus on:
 1. design risks and hidden assumptions
 2. likely files/modules involved
@@ -105,6 +108,12 @@ The file format is:
 - Created: <utc timestamp>
 - Log: <log file path>
 - Status: success|failed
+- Git branch: <branch>
+- Git commit: <short commit>
+- Git dirty: true|false
+- Codegraph: used|unavailable|not checked
+- Target files: <files or "not provided">
+- AGY command: `agy --sandbox --new-project ... --print "<prompt>"`
 
 ## Prompt
 
@@ -139,5 +148,8 @@ The wrapper supports these environment overrides:
 - `AGY_REVIEW_DIR`: defaults to `<workspace>/.agy-reviews`.
 - `AGY_REVIEW_FILE`: overrides the Markdown output file path.
 - `AGY_REVIEW_LOG`: overrides the log file path.
+- `AGY_REVIEW_CODEGRAPH`: records codegraph state in the review file, such as `used`, `unavailable`, or `not checked`.
+- `AGY_REVIEW_CONTEXT`: adds concise local context gathered from codegraph or `rg` into the wrapped prompt.
+- `AGY_REVIEW_TARGET_FILES`: records the reviewed file list in the review file and wrapped prompt.
 
 Use `agy models` to verify model availability when failures mention an unknown model.
