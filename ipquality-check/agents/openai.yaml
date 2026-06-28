@@ -1,0 +1,4 @@
+interface:
+  display_name: "IPQuality Check"
+  short_description: "Run and interpret IP quality checks"
+  default_prompt: "Use $ipquality-check to check the current server IP risk, media unlock status, and blacklist signals."
