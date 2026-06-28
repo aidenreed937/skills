@@ -69,6 +69,11 @@ Focus on:
 4. tests or verification needed
 5. questions that must be resolved before coding
 
+Output requirements:
+- Label each substantive claim as [verified], [inferred], or [speculative].
+- Do not use must, definitely, or certainly unless verified from local files.
+- Separate immediate doc/code fixes from Phase 0 validation risks.
+
 Prefer file references as path:line when possible. If you need to run tools, keep them read-only unless explicitly approved.
 ```
 
@@ -99,6 +104,7 @@ The file format is:
 - Model: Gemini 3.1 Pro (High)
 - Created: <utc timestamp>
 - Log: <log file path>
+- Status: success|failed
 
 ## Prompt
 
@@ -109,6 +115,11 @@ The file format is:
 ## Review
 
 <agy output>
+
+## Run Status
+
+- Status: success|failed
+- Exit code: <only present on failure>
 ````
 
 Each run also gets a unique log file:
