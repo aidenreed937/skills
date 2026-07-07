@@ -21,10 +21,14 @@ if [ "$#" -eq 0 ]; then
   exit 64
 fi
 
-model="${CLAUDE_REVIEW_MODEL-opus}"
-fallback_model="${CLAUDE_REVIEW_FALLBACK_MODEL-sonnet}"
+model="${CLAUDE_REVIEW_MODEL-}"
+fallback_model="${CLAUDE_REVIEW_FALLBACK_MODEL-}"
 permission_mode="${CLAUDE_REVIEW_PERMISSION_MODE:-plan}"
-tools="${CLAUDE_REVIEW_TOOLS-Read,Grep,Glob,LS}"
+tools="${CLAUDE_REVIEW_TOOLS-}"
+tools_configured="false"
+if [ "${CLAUDE_REVIEW_TOOLS+x}" = "x" ]; then
+  tools_configured="true"
+fi
 max_budget="${CLAUDE_REVIEW_MAX_BUDGET_USD:-}"
 mcp_config="${CLAUDE_REVIEW_MCP_CONFIG:-}"
 strict_mcp="${CLAUDE_REVIEW_STRICT_MCP_CONFIG:-}"
@@ -60,8 +64,15 @@ else
 fi
 
 user_prompt="$*"
+if [ "$tools_configured" = "true" ] && [ -n "$tools" ]; then
+  tool_instruction="You are an independent reviewer. Review only; do not modify files. If you inspect files, use only explicitly allowed read-only tools."
+elif [ "$tools_configured" = "true" ]; then
+  tool_instruction="You are an independent reviewer. Review only; do not modify files or run tools. No tools are allowed for this run."
+else
+  tool_instruction="You are an independent reviewer. Review only; do not modify files or run tools. Base the review on the provided local context."
+fi
 prompt="$(printf '%s\n\n%s\n\n%s\n%s\n\n%s\n%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n' \
-  "You are an independent reviewer. Review only; do not modify files." \
+  "$tool_instruction" \
   "Task: $user_prompt" \
   "Known local context:" \
   "${local_context:-not provided}" \
@@ -74,7 +85,10 @@ prompt="$(printf '%s\n\n%s\n\n%s\n%s\n\n%s\n%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n' \
   "- Prefer file references as path:line when possible." \
   "- If context is missing, say what needs to be checked instead of guessing.")"
 
-cmd=(claude --print --no-session-persistence --model "$model")
+cmd=(claude --print --no-session-persistence)
+if [ -n "$model" ]; then
+  cmd+=(--model "$model")
+fi
 if [ -n "$fallback_model" ]; then
   cmd+=(--fallback-model "$fallback_model")
 fi
@@ -97,10 +111,15 @@ if [ -n "$add_dirs" ]; then
   done
   IFS="$old_ifs"
 fi
-cmd+=("--allowedTools=$tools")
+if [ "$tools_configured" = "true" ]; then
+  cmd+=("--allowedTools=$tools")
+fi
 cmd+=(--permission-mode "$permission_mode")
 
-claude_command="claude --print --no-session-persistence --model \"$model\""
+claude_command="claude --print --no-session-persistence"
+if [ -n "$model" ]; then
+  claude_command="$claude_command --model \"$model\""
+fi
 if [ -n "$fallback_model" ]; then
   claude_command="$claude_command --fallback-model \"$fallback_model\""
 fi
@@ -116,7 +135,9 @@ fi
 if [ -n "$add_dirs" ]; then
   claude_command="$claude_command --add-dir \"<configured>\""
 fi
-claude_command="$claude_command --allowedTools=\"$tools\""
+if [ "$tools_configured" = "true" ]; then
+  claude_command="$claude_command --allowedTools=\"$tools\""
+fi
 claude_command="$claude_command --permission-mode \"$permission_mode\""
 claude_command="$claude_command \"<prompt>\""
 mcp_status="not provided"
@@ -132,7 +153,7 @@ mkdir -p "$(dirname "$log_file")"
   echo "# Claude Review"
   echo
   echo "- Project: $PWD"
-  echo "- Model: $model"
+  echo "- Model: ${model:-Claude CLI default}"
   echo "- Fallback model: ${fallback_model:-not configured}"
   echo "- Created: $timestamp"
   echo "- Log: $log_file"
@@ -187,7 +208,7 @@ else
     echo "- The output looks auth-related. Run 'claude auth status'. If this ran inside Codex sandbox, rerun the same claude command with escalated execution while keeping plan mode and read-only tools." >&2
   fi
   if printf '%s' "$failure_tail" | grep -Eiq 'model|unknown model|not available|fallback'; then
-    echo "- The output may be model-related. Verify CLAUDE_REVIEW_MODEL, or try CLAUDE_REVIEW_MODEL=sonnet." >&2
+    echo "- The output may be model-related. Omit CLAUDE_REVIEW_MODEL and CLAUDE_REVIEW_FALLBACK_MODEL to use the Claude CLI default model, or verify the exact model aliases available in this environment." >&2
   fi
   if printf '%s' "$failure_tail" | grep -Eiq 'budget|max-budget|cost|quota|rate limit|overloaded'; then
     echo "- The output looks budget, quota, or capacity related. Adjust CLAUDE_REVIEW_MAX_BUDGET_USD, retry later, or use a cheaper fallback model." >&2
@@ -199,7 +220,7 @@ else
     echo "- The output may be MCP-related. Check CLAUDE_REVIEW_MCP_CONFIG and 'claude mcp list' or run without MCP config." >&2
   fi
   if printf '%s' "$failure_tail" | grep -Eiq 'tool|tools|unknown|invalid'; then
-    echo "- The output may be tool-list related. Try CLAUDE_REVIEW_TOOLS=Read or CLAUDE_REVIEW_TOOLS= to pass an empty allow list." >&2
+    echo "- The output may be tool-list related. Omit CLAUDE_REVIEW_TOOLS for no explicit tool allowlist, or use CLAUDE_REVIEW_TOOLS=Read with the equals-form --allowedTools flag." >&2
   fi
   echo "- Check the log file recorded in the review header: $log_file" >&2
 fi

@@ -20,16 +20,17 @@ Prefer `bash <skill-dir>/scripts/claude-review.sh` even when the script is execu
 If the bundled script path is not available in the current Codex environment, use the equivalent raw command from the target repository:
 
 ```bash
-claude --print --no-session-persistence --model opus --fallback-model sonnet --allowedTools=Read,Grep,Glob,LS --permission-mode plan "<prompt>"
+claude --print --no-session-persistence --permission-mode plan "<prompt>"
 ```
 
 Claude Code non-interactive mode skips the workspace trust dialog. Run it only from repositories the user intends to let Claude inspect. If Codex cannot access the user's Claude auth, rerun the same command with escalated execution while keeping `--permission-mode plan` and read-only tools.
 
 ## Safety Rules
 
-- Use `opus` as the default review model and `sonnet` as the default fallback model.
+- Do not specify a model by default; let the user's Claude CLI default model apply.
 - Use `--print`, `--no-session-persistence`, and `--permission-mode plan` by default.
-- Allow only read-oriented tools by default: `Read,Grep,Glob,LS`.
+- Do not grant Claude tools by default. Prefer Codex-side codegraph or `rg` context in the prompt.
+- If Claude must inspect files itself, explicitly set `CLAUDE_REVIEW_TOOLS` and pass tools with equals form, such as `--allowedTools=Read,Grep,Glob,LS`.
 - Never use `--dangerously-skip-permissions`, `--allow-dangerously-skip-permissions`, or `--permission-mode bypassPermissions` unless the user explicitly asks for that risk.
 - Ask Claude to review and plan only; do not ask it to edit files.
 - Add extra read context with `--add-dir <path>` only when the user-requested review spans multiple directories.
@@ -49,7 +50,7 @@ Relevant Claude Code CLI capabilities confirmed from `claude --help` on this mac
 - Auth commands: `claude auth login`, `claude auth logout`, and `claude auth status`.
 - MCP management commands: `claude mcp add`, `claude mcp add-json`, `claude mcp list`, and `claude mcp get`.
 
-For this review skill, prefer `plan` permission mode plus read-only tools. Pass tool lists with the equals form, such as `--allowedTools=Read,Grep,Glob,LS`; the space-separated form is variadic and can consume the final prompt. Put other variable-length options such as `--add-dir` before a later fixed option such as `--permission-mode "$mode"` so the final prompt is not parsed as another directory argument. Do not rely on Claude's permission system as the only safety layer; Codex should still gather focused local context and verify findings before changing files.
+For this review skill, prefer `plan` permission mode with no Claude tools by default. Pass tool lists with the equals form only when needed, such as `--allowedTools=Read,Grep,Glob,LS`; the space-separated form is variadic and can consume the final prompt. Put other variable-length options such as `--add-dir` before a later fixed option such as `--permission-mode "$mode"` so the final prompt is not parsed as another directory argument. Do not rely on Claude's permission system as the only safety layer; Codex should still gather focused local context and verify findings before changing files.
 
 ## Codegraph Acceleration
 
@@ -68,7 +69,7 @@ Fallback when codegraph is unavailable:
 - Use `rg`, `rg --files`, and focused file reads to build the prompt context.
 - Do not call codegraph repeatedly for a project after it reports no `.codegraph/` index in the current session.
 
-To let Claude Code itself connect to codegraph MCP for a run, first check `claude mcp list`. If `codegraph` is already connected, explicitly allow the read-only MCP tools for that run:
+To let Claude Code itself connect to codegraph MCP for a run, first check `claude mcp list`. If `codegraph` is already connected, explicitly allow the read-only MCP tools for that run. Use this only when Codex-side codegraph context is insufficient, because long prompts plus tool authorization can be much slower.
 
 ```bash
 CLAUDE_REVIEW_TOOLS="Read,Grep,Glob,LS,mcp__codegraph__status,mcp__codegraph__explore,mcp__codegraph__impact,mcp__codegraph__files" \
@@ -121,7 +122,7 @@ Output requirements:
 - Do not use must, definitely, or certainly unless verified from local files.
 - Separate immediate doc/code fixes from Phase 0 validation risks.
 
-Prefer file references as path:line when possible. If you need to inspect files, use only read-only tools.
+Prefer file references as path:line when possible. By default, do not ask Claude to run tools; provide the relevant codegraph or `rg` context in the prompt. Only permit Claude tools when the user explicitly wants Claude to inspect files itself.
 ```
 
 ## Review Workflow
@@ -148,8 +149,8 @@ The file format is:
 # Claude Review
 
 - Project: <workspace path>
-- Model: opus
-- Fallback model: sonnet
+- Model: Claude CLI default
+- Fallback model: not configured
 - Created: <utc timestamp>
 - Log: <log file path>
 - Status: success|failed
@@ -159,7 +160,7 @@ The file format is:
 - Codegraph: used|unavailable|not checked
 - Target files: <files or "not provided">
 - MCP config: <not provided|configured>
-- Claude command: `claude --print --no-session-persistence ... --permission-mode "<mode>" "<prompt>"`
+- Claude command: `claude --print --no-session-persistence --permission-mode "<mode>" "<prompt>"`
 
 ## Prompt
 
@@ -185,14 +186,33 @@ ${TMPDIR:-/tmp}/claude-review-<project-name>-<utc-timestamp>-<pid>.log
 
 Use `--no-session-persistence` for every review run so unrelated project reviews do not reuse recent Claude conversation state. The output filename includes the process id, so concurrent reviews in multiple projects will not collide unless `CLAUDE_REVIEW_FILE` is manually reused.
 
+If forced to use a raw CLI command instead of the wrapper, still write the successful output to `.claude-reviews`:
+
+```bash
+mkdir -p .claude-reviews
+review_file=".claude-reviews/$(basename "$PWD")-$(date -u +%Y%m%dT%H%M%SZ)-raw.md"
+{
+  echo "# Claude Review"
+  echo
+  echo "- Project: $PWD"
+  echo "- Model: Claude CLI default"
+  echo "- Created: $(date -u +%Y%m%dT%H%M%SZ)"
+  echo "- Status: success"
+  echo
+  echo "## Review"
+  echo
+  claude --print --no-session-persistence --permission-mode plan "<prompt>"
+} | tee "$review_file"
+```
+
 ## Configuration
 
 The wrapper supports these environment overrides:
 
-- `CLAUDE_REVIEW_MODEL`: defaults to `opus`.
-- `CLAUDE_REVIEW_FALLBACK_MODEL`: defaults to `sonnet`; set empty to disable fallback.
+- `CLAUDE_REVIEW_MODEL`: optional; unset by default so Claude CLI chooses its default model.
+- `CLAUDE_REVIEW_FALLBACK_MODEL`: optional; unset by default.
 - `CLAUDE_REVIEW_PERMISSION_MODE`: defaults to `plan`.
-- `CLAUDE_REVIEW_TOOLS`: defaults to `Read,Grep,Glob,LS`; set empty to disable all Claude tools; include specific `mcp__codegraph__...` names if Claude should call codegraph MCP itself.
+- `CLAUDE_REVIEW_TOOLS`: unset by default, so no explicit tool allowlist is passed; set to `Read,Grep,Glob,LS` or specific `mcp__codegraph__...` names only when Claude should call tools itself; set empty to pass `--allowedTools=`.
 - `CLAUDE_REVIEW_MAX_BUDGET_USD`: optional `--max-budget-usd` value.
 - `CLAUDE_REVIEW_MCP_CONFIG`: optional path or JSON string for `--mcp-config`.
 - `CLAUDE_REVIEW_STRICT_MCP_CONFIG=1`: pass `--strict-mcp-config` when using an MCP config.
