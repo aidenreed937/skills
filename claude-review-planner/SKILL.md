@@ -24,7 +24,7 @@ bash <skill-dir>/scripts/claude-review.sh "Review this repository and propose an
 If the bundled script path is not available in the current Codex environment, use the equivalent raw command from the target repository:
 
 ```bash
-claude --print --no-session-persistence --permission-mode plan --model opus --fallback-model sonnet --tools "Read,Grep,Glob,LS" "<prompt>"
+claude --print --no-session-persistence --model opus --fallback-model sonnet --allowedTools "Read,Grep,Glob,LS" --permission-mode plan "<prompt>"
 ```
 
 Claude Code non-interactive mode skips the workspace trust dialog. Run it only from repositories the user intends to let Claude inspect. If Codex cannot access the user's Claude auth, rerun the same command with escalated execution while keeping `--permission-mode plan` and read-only tools.
@@ -46,14 +46,14 @@ Relevant Claude Code CLI capabilities confirmed from `claude --help` on this mac
 - Non-interactive review: `--print` prints a response and exits.
 - Model selection: `--model <model>` accepts aliases such as `opus` and `sonnet`; `--fallback-model <model>` works with `--print`.
 - Permission control: `--permission-mode plan|dontAsk|manual|auto|acceptEdits|bypassPermissions`.
-- Tool control: `--tools`, `--allowedTools`, and `--disallowedTools` can restrict built-in tools.
+- Tool control: `--allowedTools` / `--allowed-tools` and `--disallowedTools` / `--disallowed-tools` can restrict built-in tools.
 - Scope expansion: `--add-dir <directories...>` allows additional directories.
 - MCP support: `--mcp-config <config>` loads MCP servers; `--strict-mcp-config` ignores other MCP configs.
 - Session hygiene: `--no-session-persistence` prevents saving the review session.
 - Auth commands: `claude auth login`, `claude auth logout`, and `claude auth status`.
 - MCP management commands: `claude mcp add`, `claude mcp add-json`, `claude mcp list`, and `claude mcp get`.
 
-For this review skill, prefer `plan` permission mode plus read-only tools. Do not rely on Claude's permission system as the only safety layer; Codex should still gather focused local context and verify findings before changing files.
+For this review skill, prefer `plan` permission mode plus read-only tools. Put variable-length options such as `--allowedTools` and `--add-dir` before a later fixed option such as `--permission-mode "$mode"` so the final prompt is not parsed as another tool or directory argument. Do not rely on Claude's permission system as the only safety layer; Codex should still gather focused local context and verify findings before changing files.
 
 ## Codegraph Acceleration
 
@@ -163,7 +163,7 @@ The file format is:
 - Codegraph: used|unavailable|not checked
 - Target files: <files or "not provided">
 - MCP config: <not provided|configured>
-- Claude command: `claude --print --no-session-persistence ... "<prompt>"`
+- Claude command: `claude --print --no-session-persistence ... --permission-mode "<mode>" "<prompt>"`
 
 ## Prompt
 

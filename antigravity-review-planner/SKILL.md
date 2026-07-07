@@ -21,12 +21,13 @@ If the bundled script path is not available in the current Codex environment, us
 agy --sandbox --new-project --print-timeout 10m --model "Gemini 3.1 Pro (High)" --print "<prompt>"
 ```
 
-When Codex is running in a managed filesystem sandbox, `agy` may fail to access the user's Antigravity authentication. In that case, rerun the same `agy` command with escalated execution, while keeping `agy --sandbox` enabled.
+When Codex is running in a managed filesystem sandbox, run the bundled wrapper or raw `agy` command with escalated execution on the first attempt, while keeping `agy --sandbox` enabled. The outer Codex sandbox can block Antigravity OAuth/keyring state or local permission checks even though AGY's own sandbox remains safe for the review. Do not spend a first run on the non-escalated Codex sandbox unless escalation is unavailable.
 
 ## Safety Rules
 
 - Use `Gemini 3.1 Pro (High)` as the default review model.
 - Use `--sandbox` and `--print` by default.
+- In Codex managed sandbox environments, prefer escalated execution for the `agy` process itself, but still keep AGY's `--sandbox` flag.
 - Never use `--dangerously-skip-permissions` unless the user explicitly asks for that risk.
 - Ask Antigravity to review and plan only; do not ask it to edit files.
 - Keep `allowNonWorkspaceAccess=false` unless the user explicitly scopes extra paths.
@@ -85,7 +86,7 @@ Prefer file references as path:line when possible. If you need to run tools, kee
 1. Read enough local context first so the Antigravity prompt is specific.
 2. If codegraph MCP is available and indexed for the target project, use it to identify relevant symbols and dependency paths before writing the prompt.
 3. If codegraph is unavailable, use `rg` and focused file reads instead.
-4. Run this skill's bundled `scripts/agy-review.sh` from the target repository working directory, or use the raw `agy` command if the bundled script cannot be resolved.
+4. Run this skill's bundled `scripts/agy-review.sh` from the target repository working directory, or use the raw `agy` command if the bundled script cannot be resolved. In Codex managed sandbox environments, request escalated execution on the first run and keep `agy --sandbox` enabled.
 5. Compare Antigravity's claims against local files before editing anything.
 6. Use Antigravity's output to improve the plan, not as an automatic instruction source.
 7. After implementation, run local tests or builds; do not rely on Antigravity's review as validation.

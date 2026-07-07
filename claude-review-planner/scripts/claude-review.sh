@@ -74,11 +74,10 @@ prompt="$(printf '%s\n\n%s\n\n%s\n%s\n\n%s\n%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n' \
   "- Prefer file references as path:line when possible." \
   "- If context is missing, say what needs to be checked instead of guessing.")"
 
-cmd=(claude --print --no-session-persistence --permission-mode "$permission_mode" --model "$model")
+cmd=(claude --print --no-session-persistence --model "$model")
 if [ -n "$fallback_model" ]; then
   cmd+=(--fallback-model "$fallback_model")
 fi
-cmd+=(--tools "$tools")
 if [ -n "$max_budget" ]; then
   cmd+=(--max-budget-usd "$max_budget")
 fi
@@ -98,12 +97,13 @@ if [ -n "$add_dirs" ]; then
   done
   IFS="$old_ifs"
 fi
+cmd+=(--allowedTools "$tools")
+cmd+=(--permission-mode "$permission_mode")
 
-claude_command="claude --print --no-session-persistence --permission-mode \"$permission_mode\" --model \"$model\""
+claude_command="claude --print --no-session-persistence --model \"$model\""
 if [ -n "$fallback_model" ]; then
   claude_command="$claude_command --fallback-model \"$fallback_model\""
 fi
-claude_command="$claude_command --tools \"$tools\""
 if [ -n "$max_budget" ]; then
   claude_command="$claude_command --max-budget-usd \"$max_budget\""
 fi
@@ -116,6 +116,8 @@ fi
 if [ -n "$add_dirs" ]; then
   claude_command="$claude_command --add-dir \"<configured>\""
 fi
+claude_command="$claude_command --allowedTools \"$tools\""
+claude_command="$claude_command --permission-mode \"$permission_mode\""
 claude_command="$claude_command \"<prompt>\""
 mcp_status="not provided"
 if [ -n "$mcp_config" ]; then
@@ -197,7 +199,7 @@ else
     echo "- The output may be MCP-related. Check CLAUDE_REVIEW_MCP_CONFIG and 'claude mcp list' or run without MCP config." >&2
   fi
   if printf '%s' "$failure_tail" | grep -Eiq 'tool|tools|unknown|invalid'; then
-    echo "- The output may be tool-list related. Try CLAUDE_REVIEW_TOOLS=Read or CLAUDE_REVIEW_TOOLS= to disable Claude tools." >&2
+    echo "- The output may be tool-list related. Try CLAUDE_REVIEW_TOOLS=Read or CLAUDE_REVIEW_TOOLS= to pass an empty allow list." >&2
   fi
   echo "- Check the log file recorded in the review header: $log_file" >&2
 fi
