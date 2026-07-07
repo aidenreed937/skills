@@ -118,7 +118,7 @@ else
   echo "Common next steps:" >&2
   failure_tail="$(tail -n 160 "$output_capture" 2>/dev/null || true)"
   if printf '%s' "$failure_tail" | grep -Eiq 'sign in|not logged|login|logged in|oauth|auth|credential|keychain'; then
-    echo "- The output looks auth-related. If this ran inside Codex sandbox, rerun the same agy command with escalated execution while keeping agy --sandbox. For future Codex runs, prefer escalated execution on the first attempt." >&2
+    echo "- The output looks auth-related. In Codex managed sandbox environments, agy must run with escalated execution so it can read the user's Antigravity login/keyring state. Rerun the same command outside the Codex sandbox while keeping agy --sandbox." >&2
   fi
   if printf '%s' "$failure_tail" | grep -Eiq 'model|available models|unknown model|not available'; then
     echo "- The output may be model-related. Run 'agy models' and verify AGY_REVIEW_MODEL or the default model name." >&2
@@ -127,7 +127,7 @@ else
     echo "- The output looks timeout-related. Increase AGY_REVIEW_TIMEOUT or reduce the prompt/context size." >&2
   fi
   if printf '%s' "$failure_tail" | grep -Eiq 'permission|denied|operation not permitted|sandbox'; then
-    echo "- The output looks permission-related. Check Antigravity permissions and whether Codex sandbox is blocking AGY state access. For future Codex runs, prefer escalated execution on the first attempt while keeping agy --sandbox." >&2
+    echo "- The output looks permission-related. In Codex managed sandbox environments, agy must run with escalated execution while keeping agy --sandbox; the outer Codex sandbox can block Antigravity state access." >&2
   fi
   echo "- Check the log file recorded in the review header: $log_file" >&2
 fi
