@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Review Planner"
+  short_description: "Claude CLI review and planning"
+  default_prompt: "Use $claude-review-planner to get an independent review and implementation plan."
