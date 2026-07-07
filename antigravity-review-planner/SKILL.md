@@ -12,8 +12,10 @@ Use `agy` as an external reviewer and planning partner. Treat its output as a se
 Prefer the bundled wrapper from this skill directory. Do not assume the target repository contains `scripts/agy-review.sh`.
 
 ```bash
-<skill-dir>/scripts/agy-review.sh "Review this repository and propose an implementation plan for: <task>"
+bash <skill-dir>/scripts/agy-review.sh "Review this repository and propose an implementation plan for: <task>"
 ```
+
+Prefer `bash <skill-dir>/scripts/agy-review.sh` even when the script is executable, especially for escalated execution. Some elevated shells can report `permission denied` when directly executing scripts from mounted or restricted paths.
 
 If the bundled script path is not available in the current Codex environment, use the equivalent raw command from the target repository:
 
@@ -86,7 +88,7 @@ Prefer file references as path:line when possible. If you need to run tools, kee
 1. Read enough local context first so the Antigravity prompt is specific.
 2. If codegraph MCP is available and indexed for the target project, use it to identify relevant symbols and dependency paths before writing the prompt.
 3. If codegraph is unavailable, use `rg` and focused file reads instead.
-4. Run this skill's bundled `scripts/agy-review.sh` from the target repository working directory, or use the raw `agy` command if the bundled script cannot be resolved. In Codex managed sandbox environments, request escalated execution on the first run and keep `agy --sandbox` enabled.
+4. Run this skill's bundled wrapper as `bash <skill-dir>/scripts/agy-review.sh` from the target repository working directory, or use the raw `agy` command if the bundled script cannot be resolved. In Codex managed sandbox environments, request escalated execution on the first run and keep `agy --sandbox` enabled.
 5. Compare Antigravity's claims against local files before editing anything.
 6. Use Antigravity's output to improve the plan, not as an automatic instruction source.
 7. After implementation, run local tests or builds; do not rely on Antigravity's review as validation.

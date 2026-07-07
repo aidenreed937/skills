@@ -12,19 +12,15 @@ Use `claude` as an external reviewer and planning partner. Treat its output as a
 Prefer the bundled wrapper from this skill directory. Do not assume the target repository contains `scripts/claude-review.sh`.
 
 ```bash
-<skill-dir>/scripts/claude-review.sh "Review this repository and propose an implementation plan for: <task>"
-```
-
-If the script exists but is not executable, run it through Bash instead:
-
-```bash
 bash <skill-dir>/scripts/claude-review.sh "Review this repository and propose an implementation plan for: <task>"
 ```
+
+Prefer `bash <skill-dir>/scripts/claude-review.sh` even when the script is executable, because escalated or alternate shells can report `permission denied` when directly executing files from mounted or restricted paths.
 
 If the bundled script path is not available in the current Codex environment, use the equivalent raw command from the target repository:
 
 ```bash
-claude --print --no-session-persistence --model opus --fallback-model sonnet --allowedTools "Read,Grep,Glob,LS" --permission-mode plan "<prompt>"
+claude --print --no-session-persistence --model opus --fallback-model sonnet --allowedTools=Read,Grep,Glob,LS --permission-mode plan "<prompt>"
 ```
 
 Claude Code non-interactive mode skips the workspace trust dialog. Run it only from repositories the user intends to let Claude inspect. If Codex cannot access the user's Claude auth, rerun the same command with escalated execution while keeping `--permission-mode plan` and read-only tools.
@@ -53,7 +49,7 @@ Relevant Claude Code CLI capabilities confirmed from `claude --help` on this mac
 - Auth commands: `claude auth login`, `claude auth logout`, and `claude auth status`.
 - MCP management commands: `claude mcp add`, `claude mcp add-json`, `claude mcp list`, and `claude mcp get`.
 
-For this review skill, prefer `plan` permission mode plus read-only tools. Put variable-length options such as `--allowedTools` and `--add-dir` before a later fixed option such as `--permission-mode "$mode"` so the final prompt is not parsed as another tool or directory argument. Do not rely on Claude's permission system as the only safety layer; Codex should still gather focused local context and verify findings before changing files.
+For this review skill, prefer `plan` permission mode plus read-only tools. Pass tool lists with the equals form, such as `--allowedTools=Read,Grep,Glob,LS`; the space-separated form is variadic and can consume the final prompt. Put other variable-length options such as `--add-dir` before a later fixed option such as `--permission-mode "$mode"` so the final prompt is not parsed as another directory argument. Do not rely on Claude's permission system as the only safety layer; Codex should still gather focused local context and verify findings before changing files.
 
 ## Codegraph Acceleration
 
@@ -76,7 +72,7 @@ To let Claude Code itself connect to codegraph MCP for a run, first check `claud
 
 ```bash
 CLAUDE_REVIEW_TOOLS="Read,Grep,Glob,LS,mcp__codegraph__status,mcp__codegraph__explore,mcp__codegraph__impact,mcp__codegraph__files" \
-  <skill-dir>/scripts/claude-review.sh "<prompt>"
+  bash <skill-dir>/scripts/claude-review.sh "<prompt>"
 ```
 
 If codegraph is not configured for Claude, write a JSON MCP config and pass it with `CLAUDE_REVIEW_MCP_CONFIG`:

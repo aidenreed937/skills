@@ -97,7 +97,7 @@ if [ -n "$add_dirs" ]; then
   done
   IFS="$old_ifs"
 fi
-cmd+=(--allowedTools "$tools")
+cmd+=("--allowedTools=$tools")
 cmd+=(--permission-mode "$permission_mode")
 
 claude_command="claude --print --no-session-persistence --model \"$model\""
@@ -116,7 +116,7 @@ fi
 if [ -n "$add_dirs" ]; then
   claude_command="$claude_command --add-dir \"<configured>\""
 fi
-claude_command="$claude_command --allowedTools \"$tools\""
+claude_command="$claude_command --allowedTools=\"$tools\""
 claude_command="$claude_command --permission-mode \"$permission_mode\""
 claude_command="$claude_command \"<prompt>\""
 mcp_status="not provided"
