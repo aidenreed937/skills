@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ -z "${TERM:-}" ] || [ "${TERM:-}" = "dumb" ]; then
+  export TERM="${AGY_REVIEW_TERM:-xterm-256color}"
+fi
+
 if ! command -v agy >/dev/null 2>&1; then
   echo "agy not found in PATH. Install or configure Antigravity CLI first." >&2
   exit 127
@@ -28,6 +32,7 @@ output_capture="$log_dir/agy-review-${project_name}-${timestamp}-$$.out.tmp"
 codegraph_used="${AGY_REVIEW_CODEGRAPH:-unknown}"
 target_files="${AGY_REVIEW_TARGET_FILES:-not provided}"
 local_context="${AGY_REVIEW_CONTEXT:-}"
+terminal_term="${TERM:-not set}"
 
 git_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 git_commit="$(git rev-parse --short HEAD 2>/dev/null || true)"
@@ -76,6 +81,7 @@ mkdir -p "$(dirname "$log_file")"
   echo "- Git dirty: $git_dirty"
   echo "- Codegraph: $codegraph_used"
   echo "- Target files: $target_files"
+  echo "- TERM: $terminal_term"
   echo "- AGY command: \`$agy_command\`"
   echo
   echo "## Prompt"

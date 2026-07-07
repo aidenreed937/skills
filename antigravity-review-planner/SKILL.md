@@ -20,7 +20,7 @@ Prefer `bash <skill-dir>/scripts/agy-review.sh` even when the script is executab
 If the bundled script path is not available in the current Codex environment, use the equivalent raw command from the target repository:
 
 ```bash
-agy --sandbox --new-project --print-timeout 10m --model "Gemini 3.1 Pro (High)" --print "<prompt>"
+TERM=xterm-256color agy --sandbox --new-project --print-timeout 10m --model "Gemini 3.1 Pro (High)" --print "<prompt>"
 ```
 
 When Codex is running in a managed filesystem sandbox, `agy` must be executed outside the Codex sandbox with escalated execution, while keeping `agy --sandbox` enabled. The outer Codex sandbox cannot read the user's Antigravity login/keyring state reliably, so non-escalated `agy` runs are expected to fail or trigger fresh authentication. Do not run `agy` inside the Codex sandbox first.
@@ -30,6 +30,7 @@ When Codex is running in a managed filesystem sandbox, `agy` must be executed ou
 - Use `Gemini 3.1 Pro (High)` as the default review model.
 - Use `--sandbox` and `--print` by default.
 - In Codex managed sandbox environments, require escalated execution for the `agy` process itself, but still keep AGY's `--sandbox` flag.
+- If `TERM` is empty or `dumb`, set `TERM=xterm-256color` before running `agy`; this avoids starship warnings such as `Under a 'dumb' terminal (TERM=dumb)` when AGY or its child shell touches prompt rendering.
 - Never use `--dangerously-skip-permissions` unless the user explicitly asks for that risk.
 - Ask Antigravity to review and plan only; do not ask it to edit files.
 - Keep `allowNonWorkspaceAccess=false` unless the user explicitly scopes extra paths.
@@ -117,6 +118,7 @@ The file format is:
 - Codegraph: used|unavailable|not checked
 - Target files: <files or "not provided">
 - AGY command: `agy --sandbox --new-project ... --print "<prompt>"`
+- TERM: xterm-256color
 
 ## Prompt
 
@@ -148,6 +150,7 @@ The wrapper supports these environment overrides:
 
 - `AGY_REVIEW_MODEL`: defaults to `Gemini 3.1 Pro (High)`.
 - `AGY_REVIEW_TIMEOUT`: defaults to `10m`.
+- `AGY_REVIEW_TERM`: defaults to `xterm-256color` when the inherited `TERM` is empty or `dumb`.
 - `AGY_REVIEW_DIR`: defaults to `<workspace>/.agy-reviews`.
 - `AGY_REVIEW_FILE`: overrides the Markdown output file path.
 - `AGY_REVIEW_LOG`: overrides the log file path.
