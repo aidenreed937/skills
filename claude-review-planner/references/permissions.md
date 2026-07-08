@@ -13,14 +13,14 @@ bash <skill-dir>/scripts/claude-review.sh "<review prompt with Codex-gathered co
 If Claude needs to inspect the repository directly, keep it file-read only:
 
 ```bash
-CLAUDE_REVIEW_TOOLS="Read,Grep,Glob,LS" \
+CLAUDE_REVIEW_TOOLS="Read,Grep,Glob" \
   bash <skill-dir>/scripts/claude-review.sh "<review prompt>"
 ```
 
 If test or type-check evidence is needed, add only the specific commands required for that repository:
 
 ```bash
-CLAUDE_REVIEW_TOOLS="Read,Grep,Glob,LS,Bash(git diff:*),Bash(git show:*),Bash(pnpm test *),Bash(pnpm lint)" \
+CLAUDE_REVIEW_TOOLS="Read,Grep,Glob,Bash(git diff:*),Bash(git show:*),Bash(pnpm test *),Bash(pnpm lint)" \
   bash <skill-dir>/scripts/claude-review.sh "<review prompt>"
 ```
 
@@ -72,7 +72,7 @@ Relevant Claude Code CLI capabilities:
 - MCP support: `--mcp-config <config>` loads MCP servers; `--strict-mcp-config` ignores other MCP configs.
 - Session hygiene: `--no-session-persistence` prevents saving the review session.
 
-Prefer `plan` permission mode. Leave `CLAUDE_REVIEW_TOOLS` unset for strict no-tool review, or pass narrow read-only tool lists with the equals form only when needed, such as `--allowedTools=Read,Grep,Glob,LS`. The space-separated form is variadic and can consume the final prompt. Put other variable-length options such as `--add-dir` before a later fixed option such as `--permission-mode "$mode"`.
+Prefer `plan` permission mode. Leave `CLAUDE_REVIEW_TOOLS` unset for strict no-tool review, or pass narrow read-only tool lists with the equals form only when needed, such as `--allowedTools=Read,Grep,Glob`. The space-separated form is variadic and can consume the final prompt. Put other variable-length options such as `--add-dir` before a later fixed option such as `--permission-mode "$mode"`.
 
 ## Implementation Or Fix Mode
 

@@ -37,9 +37,9 @@ When Codex is running in a managed filesystem sandbox, `agy` must be executed ou
 - Use `--sandbox` and `--print` by default.
 - In Codex managed sandbox environments, require escalated execution for the `agy` process itself, but still keep AGY's `--sandbox` flag.
 - If `TERM` is empty or `dumb`, set `TERM=xterm-256color` before running `agy`; this avoids starship warnings such as `Under a 'dumb' terminal (TERM=dumb)` when AGY or its child shell touches prompt rendering.
-- If the Codex tool process does not inherit the user's shell proxy variables, set `AGY_REVIEW_PROXY` before invoking the wrapper. The wrapper exports it to `HTTP_PROXY`, `HTTPS_PROXY`, `http_proxy`, `https_proxy`, `ALL_PROXY`, and `all_proxy` when those variables are not already set. Set `AGY_REVIEW_NO_PROXY` for local bypasses such as `localhost,127.0.0.1,::1`.
+- Use the standard proxy environment variables already present in the execution environment, such as `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY`. If Codex does not inherit the user's proxy environment, pass those standard variables explicitly when invoking the wrapper.
 - Run a short `AGY_REVIEW_PREFLIGHT=1` smoke test before long reviews when auth, proxy, or background execution is uncertain.
-- Prefer `scripts/agy-review-background.sh` for long-running background reviews. It starts with `tmux` when available, then `screen`; if neither is available, run the foreground wrapper instead of using `nohup`.
+- Prefer `scripts/agy-review-background.sh` for normal and long-running reviews. It starts with `tmux -L <socket>` when available, then `screen`; if neither is available, run the foreground wrapper instead of using `nohup`.
 - Do not put large prompt context into shell environment variables when file inputs are practical. Use `AGY_REVIEW_PROMPT_FILE`, `AGY_REVIEW_CONTEXT_FILE`, and `AGY_REVIEW_TARGET_FILES_FILE` for long or multiline values.
 - Never use `--dangerously-skip-permissions` unless the user explicitly asks for that risk.
 - Ask Antigravity to review and plan only; do not ask it to edit files.
@@ -102,7 +102,7 @@ Prefer file references as path:line when possible. If you need to run tools, kee
 2. If codegraph MCP is available and indexed for the target project, use it to identify relevant symbols and dependency paths before writing the prompt.
 3. If codegraph is unavailable, use `rg` and focused file reads instead.
 4. If the environment is not already proven, run a 30 second smoke test with `AGY_REVIEW_PREFLIGHT=1` and any required proxy variables first. Fix auth, proxy, or timeout failures before starting the real review.
-5. Run this skill's bundled wrapper as `bash <skill-dir>/scripts/agy-review.sh` from the target repository working directory, or use `bash <skill-dir>/scripts/agy-review-background.sh` for long-running reviews. In Codex managed sandbox environments, the tool call must use `sandbox_permissions: "require_escalated"` and keep `agy --sandbox` enabled.
+5. Run this skill's bundled background launcher as `bash <skill-dir>/scripts/agy-review-background.sh` from the target repository working directory for normal reviews. Use `scripts/agy-review.sh` only for short smoke tests or synchronous debugging. In Codex managed sandbox environments, the tool call must use `sandbox_permissions: "require_escalated"` and keep `agy --sandbox` enabled.
 6. Compare Antigravity's claims against local files before editing anything.
 7. Use Antigravity's output to improve the plan, not as an automatic instruction source.
 8. After implementation, run local tests or builds; do not rely on Antigravity's review as validation.

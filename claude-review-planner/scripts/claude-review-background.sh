@@ -16,6 +16,11 @@ if [ -z "$project_name" ]; then
 fi
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 session_name="${CLAUDE_REVIEW_SESSION:-claude-review-${project_name}-${timestamp}}"
+default_tmux_socket="$(printf '%s' "$session_name" | tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-*//; s/-*$//')"
+if [ -z "$default_tmux_socket" ]; then
+  default_tmux_socket="claude-review"
+fi
+tmux_socket="${CLAUDE_REVIEW_TMUX_SOCKET:-$default_tmux_socket}"
 log_dir="${TMPDIR:-/tmp}"
 log_dir="${log_dir%/}"
 launcher_log="${CLAUDE_REVIEW_BACKGROUND_LOG:-$log_dir/claude-review-${project_name}-${timestamp}-background.log}"
@@ -69,6 +74,7 @@ for env_name in \
   CLAUDE_REVIEW_TARGET_FILES \
   CLAUDE_REVIEW_TARGET_FILES_FILE \
   CLAUDE_REVIEW_USE_LOGIN_SHELL \
+  CLAUDE_REVIEW_TMUX_SOCKET \
   ANTHROPIC_API_KEY \
   CLAUDE_CODE_OAUTH_TOKEN \
   HTTP_PROXY \
@@ -93,6 +99,7 @@ chmod +x "$run_script"
   echo "created=$timestamp"
   echo "workspace=$workspace"
   echo "session=$session_name"
+  echo "tmux_socket=$tmux_socket"
   echo "prompt_file=$prompt_file"
   echo "run_script=$run_script"
   echo "launcher_log=$launcher_log"
@@ -104,7 +111,7 @@ chmod +x "$run_script"
 
 if command -v tmux >/dev/null 2>&1; then
   runner="bash $(quote "$run_script") 2>&1 | tee -a $(quote "$launcher_log")"
-  tmux new-session -d -s "$session_name" "$runner"
+  tmux -L "$tmux_socket" new-session -d -s "$session_name" "$runner"
   mode="tmux"
 elif command -v screen >/dev/null 2>&1; then
   runner="bash $(quote "$run_script") 2>&1 | tee -a $(quote "$launcher_log")"
@@ -132,7 +139,8 @@ echo "Launcher log: $launcher_log"
 echo "Prompt file: $prompt_file"
 echo "Run script: $run_script"
 if [ "$mode" = "tmux" ]; then
-  echo "Attach: tmux attach -t $session_name"
+  echo "Tmux socket: $tmux_socket"
+  echo "Attach: tmux -L $tmux_socket attach -t $session_name"
 elif [ "$mode" = "screen" ]; then
   echo "Attach: screen -r $session_name"
 fi

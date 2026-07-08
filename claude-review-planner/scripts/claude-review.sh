@@ -30,7 +30,7 @@ tools_configured="false"
 if [ "${CLAUDE_REVIEW_TOOLS+x}" = "x" ]; then
   tools_configured="true"
 fi
-default_disallowed_tools="Bash,Read,Write,Edit,MultiEdit,NotebookEdit,Grep,Glob,LS,WebFetch,WebSearch,Task"
+default_disallowed_tools="Bash,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch,Task"
 if [ "${CLAUDE_REVIEW_DISALLOWED_TOOLS+x}" = "x" ]; then
   disallowed_tools="${CLAUDE_REVIEW_DISALLOWED_TOOLS}"
 elif [ "$tools_configured" = "false" ] || [ -z "$tools" ]; then
@@ -177,6 +177,20 @@ mkdir -p "$review_dir"
 mkdir -p "$(dirname "$review_file")"
 mkdir -p "$(dirname "$log_file")"
 
+update_review_status() {
+  local next_status="$1"
+  local tmp_file="${review_file}.status.$$"
+  awk -v next_status="$next_status" '
+    !updated && $0 == "- Status: running" {
+      print "- Status: " next_status
+      updated = 1
+      next
+    }
+    { print }
+  ' "$review_file" > "$tmp_file"
+  mv "$tmp_file" "$review_file"
+}
+
 {
   echo "# Claude Review"
   echo
@@ -256,11 +270,10 @@ else
 fi
 
 if [ "$status" -eq 0 ]; then
-  sed -i.bak 's/^- Status: running$/- Status: success/' "$review_file"
+  update_review_status "success"
 else
-  sed -i.bak 's/^- Status: running$/- Status: failed/' "$review_file"
+  update_review_status "failed"
 fi
-rm -f "$review_file.bak"
 rm -f "$output_capture"
 
 exit "$status"

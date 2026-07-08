@@ -34,9 +34,10 @@ For normal review runs, prefer the background launcher instead of blocking the c
 bash <skill-dir>/scripts/claude-review-background.sh "Review this repository and propose an implementation plan for: <task>"
 ```
 
-The background launcher uses `tmux new-session -d` when available and falls back to `screen -dmS`. If neither terminal multiplexer is installed, it fails with a launcher log path instead of using `nohup`. Report these values back to the user:
+The background launcher uses `tmux -L <socket> new-session -d` when available and falls back to `screen -dmS`. It defaults to a per-run tmux socket so it does not reuse an existing server with different sandbox or filesystem permissions. If neither terminal multiplexer is installed, it fails with a launcher log path instead of using `nohup`. Report these values back to the user:
 
 - Session name.
+- Tmux socket when mode is `tmux`.
 - Launcher log path.
 - Prompt file path.
 - Generated run script path.
@@ -70,8 +71,8 @@ The wrapper supports these environment overrides:
 - `CLAUDE_REVIEW_MODEL`: optional; unset by default so Claude CLI chooses its default model.
 - `CLAUDE_REVIEW_FALLBACK_MODEL`: optional; unset by default.
 - `CLAUDE_REVIEW_PERMISSION_MODE`: defaults to `plan`.
-- `CLAUDE_REVIEW_TOOLS`: unset by default, so no explicit tool allowlist is passed and the default deny list applies; set to `Read,Grep,Glob,LS` or specific `mcp__codegraph__...` names only when Claude should call tools itself; set empty to keep the default deny list without passing an empty `--allowedTools`.
-- `CLAUDE_REVIEW_DISALLOWED_TOOLS`: optional explicit `--disallowedTools` list. When unset and `CLAUDE_REVIEW_TOOLS` is unset or empty, the wrapper denies common built-in tools by default: `Bash,Read,Write,Edit,MultiEdit,NotebookEdit,Grep,Glob,LS,WebFetch,WebSearch,Task`.
+- `CLAUDE_REVIEW_TOOLS`: unset by default, so no explicit tool allowlist is passed and the default deny list applies; set to `Read,Grep,Glob` or specific `mcp__codegraph__...` names only when Claude should call tools itself; set empty to keep the default deny list without passing an empty `--allowedTools`.
+- `CLAUDE_REVIEW_DISALLOWED_TOOLS`: optional explicit `--disallowedTools` list. When unset and `CLAUDE_REVIEW_TOOLS` is unset or empty, the wrapper denies common built-in tools by default: `Bash,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch,Task`.
 - `CLAUDE_REVIEW_MAX_BUDGET_USD`: optional `--max-budget-usd` value.
 - `CLAUDE_REVIEW_MCP_CONFIG`: optional path or JSON string for `--mcp-config`.
 - `CLAUDE_REVIEW_STRICT_MCP_CONFIG=1`: pass `--strict-mcp-config` when using an MCP config.
@@ -91,5 +92,6 @@ The wrapper supports these environment overrides:
 - `CLAUDE_REVIEW_BACKGROUND_SCRIPT`: generated run script path for `scripts/claude-review-background.sh`.
 - `CLAUDE_REVIEW_BACKGROUND_PROMPT_FILE`: generated prompt file path for `scripts/claude-review-background.sh` when `CLAUDE_REVIEW_PROMPT_FILE` is not set.
 - `CLAUDE_REVIEW_BACKGROUND_SESSION`: set by the background launcher and recorded in the review file.
+- `CLAUDE_REVIEW_TMUX_SOCKET`: tmux socket name for `scripts/claude-review-background.sh`; defaults to a sanitized session name.
 
 Use `claude auth status` to verify authentication when failures mention login, credentials, or subscription access.

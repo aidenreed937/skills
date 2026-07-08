@@ -5,20 +5,6 @@ if [ -z "${TERM:-}" ] || [ "${TERM:-}" = "dumb" ]; then
   export TERM="${AGY_REVIEW_TERM:-xterm-256color}"
 fi
 
-if [ -n "${AGY_REVIEW_PROXY:-}" ]; then
-  export HTTP_PROXY="${HTTP_PROXY:-$AGY_REVIEW_PROXY}"
-  export HTTPS_PROXY="${HTTPS_PROXY:-$AGY_REVIEW_PROXY}"
-  export http_proxy="${http_proxy:-$AGY_REVIEW_PROXY}"
-  export https_proxy="${https_proxy:-$AGY_REVIEW_PROXY}"
-  export ALL_PROXY="${ALL_PROXY:-$AGY_REVIEW_PROXY}"
-  export all_proxy="${all_proxy:-$AGY_REVIEW_PROXY}"
-fi
-
-if [ -n "${AGY_REVIEW_NO_PROXY:-}" ]; then
-  export NO_PROXY="${NO_PROXY:-$AGY_REVIEW_NO_PROXY}"
-  export no_proxy="${no_proxy:-$AGY_REVIEW_NO_PROXY}"
-fi
-
 if ! command -v agy >/dev/null 2>&1; then
   echo "agy not found in PATH. Install or configure Antigravity CLI first." >&2
   exit 127
@@ -105,6 +91,20 @@ mkdir -p "$review_dir"
 mkdir -p "$(dirname "$review_file")"
 mkdir -p "$(dirname "$log_file")"
 
+update_review_status() {
+  local next_status="$1"
+  local tmp_file="${review_file}.status.$$"
+  awk -v next_status="$next_status" '
+    !updated && $0 == "- Status: running" {
+      print "- Status: " next_status
+      updated = 1
+      next
+    }
+    { print }
+  ' "$review_file" > "$tmp_file"
+  mv "$tmp_file" "$review_file"
+}
+
 {
   echo "# Antigravity Review"
   echo
@@ -184,8 +184,7 @@ if [ "${AGY_REVIEW_PREFLIGHT:-false}" = "1" ] || [ "${AGY_REVIEW_PREFLIGHT:-fals
 
   if [ "$preflight_status" -ne 0 ]; then
     echo "Review preflight failed with exit code $preflight_status. Output written to: $review_file" >&2
-    sed -i.bak 's/^- Status: running$/- Status: failed/' "$review_file"
-    rm -f "$review_file.bak"
+    update_review_status "failed"
     rm -f "$preflight_output"
     exit "$preflight_status"
   fi
@@ -236,11 +235,10 @@ else
 fi
 
 if [ "$status" -eq 0 ]; then
-  sed -i.bak 's/^- Status: running$/- Status: success/' "$review_file"
+  update_review_status "success"
 else
-  sed -i.bak 's/^- Status: running$/- Status: failed/' "$review_file"
+  update_review_status "failed"
 fi
-rm -f "$review_file.bak"
 rm -f "$output_capture"
 rm -f "$preflight_output"
 
