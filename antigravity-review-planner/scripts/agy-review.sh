@@ -5,6 +5,20 @@ if [ -z "${TERM:-}" ] || [ "${TERM:-}" = "dumb" ]; then
   export TERM="${AGY_REVIEW_TERM:-xterm-256color}"
 fi
 
+if [ -n "${AGY_REVIEW_PROXY:-}" ]; then
+  export HTTP_PROXY="${HTTP_PROXY:-$AGY_REVIEW_PROXY}"
+  export HTTPS_PROXY="${HTTPS_PROXY:-$AGY_REVIEW_PROXY}"
+  export http_proxy="${http_proxy:-$AGY_REVIEW_PROXY}"
+  export https_proxy="${https_proxy:-$AGY_REVIEW_PROXY}"
+  export ALL_PROXY="${ALL_PROXY:-$AGY_REVIEW_PROXY}"
+  export all_proxy="${all_proxy:-$AGY_REVIEW_PROXY}"
+fi
+
+if [ -n "${AGY_REVIEW_NO_PROXY:-}" ]; then
+  export NO_PROXY="${NO_PROXY:-$AGY_REVIEW_NO_PROXY}"
+  export no_proxy="${no_proxy:-$AGY_REVIEW_NO_PROXY}"
+fi
+
 if ! command -v agy >/dev/null 2>&1; then
   echo "agy not found in PATH. Install or configure Antigravity CLI first." >&2
   exit 127
@@ -33,6 +47,8 @@ codegraph_used="${AGY_REVIEW_CODEGRAPH:-unknown}"
 target_files="${AGY_REVIEW_TARGET_FILES:-not provided}"
 local_context="${AGY_REVIEW_CONTEXT:-}"
 terminal_term="${TERM:-not set}"
+proxy_summary="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-not set}}}}"
+no_proxy_summary="${NO_PROXY:-${no_proxy:-not set}}"
 
 git_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 git_commit="$(git rev-parse --short HEAD 2>/dev/null || true)"
@@ -82,6 +98,8 @@ mkdir -p "$(dirname "$log_file")"
   echo "- Codegraph: $codegraph_used"
   echo "- Target files: $target_files"
   echo "- TERM: $terminal_term"
+  echo "- Proxy: $proxy_summary"
+  echo "- NO_PROXY: $no_proxy_summary"
   echo "- AGY command: \`$agy_command\`"
   echo
   echo "## Prompt"

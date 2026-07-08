@@ -31,6 +31,7 @@ When Codex is running in a managed filesystem sandbox, `agy` must be executed ou
 - Use `--sandbox` and `--print` by default.
 - In Codex managed sandbox environments, require escalated execution for the `agy` process itself, but still keep AGY's `--sandbox` flag.
 - If `TERM` is empty or `dumb`, set `TERM=xterm-256color` before running `agy`; this avoids starship warnings such as `Under a 'dumb' terminal (TERM=dumb)` when AGY or its child shell touches prompt rendering.
+- If the Codex tool process does not inherit the user's shell proxy variables, set `AGY_REVIEW_PROXY` before invoking the wrapper. The wrapper exports it to `HTTP_PROXY`, `HTTPS_PROXY`, `http_proxy`, `https_proxy`, `ALL_PROXY`, and `all_proxy` when those variables are not already set. Set `AGY_REVIEW_NO_PROXY` for local bypasses such as `localhost,127.0.0.1,::1`.
 - Never use `--dangerously-skip-permissions` unless the user explicitly asks for that risk.
 - Ask Antigravity to review and plan only; do not ask it to edit files.
 - Keep `allowNonWorkspaceAccess=false` unless the user explicitly scopes extra paths.
@@ -157,5 +158,7 @@ The wrapper supports these environment overrides:
 - `AGY_REVIEW_CODEGRAPH`: records codegraph state in the review file, such as `used`, `unavailable`, or `not checked`.
 - `AGY_REVIEW_CONTEXT`: adds concise local context gathered from codegraph or `rg` into the wrapped prompt.
 - `AGY_REVIEW_TARGET_FILES`: records the reviewed file list in the review file and wrapped prompt.
+- `AGY_REVIEW_PROXY`: optional proxy URL for Codex-launched `agy` processes, for example `http://127.0.0.1:7897`; exported to standard uppercase and lowercase proxy variables if they are unset.
+- `AGY_REVIEW_NO_PROXY`: optional local bypass list, for example `localhost,127.0.0.1,::1`; exported to `NO_PROXY` and `no_proxy` if they are unset.
 
 Use `agy models` to verify model availability when failures mention an unknown model.
