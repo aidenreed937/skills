@@ -24,8 +24,9 @@ if ! command -v agy >/dev/null 2>&1; then
   exit 127
 fi
 
-if [ "$#" -eq 0 ]; then
+if [ "$#" -eq 0 ] && [ -z "${AGY_REVIEW_PROMPT_FILE:-}" ]; then
   echo "Usage: $0 <review prompt> [additional prompt args...]" >&2
+  echo "       AGY_REVIEW_PROMPT_FILE=/path/to/prompt.txt $0" >&2
   exit 64
 fi
 
@@ -43,12 +44,28 @@ log_dir="${TMPDIR:-/tmp}"
 log_dir="${log_dir%/}"
 log_file="${AGY_REVIEW_LOG:-$log_dir/agy-review-${project_name}-${timestamp}-$$.log}"
 output_capture="$log_dir/agy-review-${project_name}-${timestamp}-$$.out.tmp"
+preflight_output="$log_dir/agy-review-${project_name}-${timestamp}-$$.preflight.out.tmp"
+preflight_log_file="${AGY_REVIEW_PREFLIGHT_LOG:-$log_dir/agy-review-${project_name}-${timestamp}-$$.preflight.log}"
 codegraph_used="${AGY_REVIEW_CODEGRAPH:-unknown}"
-target_files="${AGY_REVIEW_TARGET_FILES:-not provided}"
-local_context="${AGY_REVIEW_CONTEXT:-}"
+if [ -n "${AGY_REVIEW_TARGET_FILES_FILE:-}" ]; then
+  target_files="$(cat "$AGY_REVIEW_TARGET_FILES_FILE")"
+else
+  target_files="${AGY_REVIEW_TARGET_FILES:-not provided}"
+fi
+if [ -n "${AGY_REVIEW_CONTEXT_FILE:-}" ]; then
+  local_context="$(cat "$AGY_REVIEW_CONTEXT_FILE")"
+else
+  local_context="${AGY_REVIEW_CONTEXT:-}"
+fi
 terminal_term="${TERM:-not set}"
 proxy_summary="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-not set}}}}"
 no_proxy_summary="${NO_PROXY:-${no_proxy:-not set}}"
+agy_path="$(command -v agy 2>/dev/null || true)"
+agy_version="$(agy --version 2>/dev/null || true)"
+if [ -z "$agy_version" ]; then
+  agy_version="not available"
+fi
+background_session="${AGY_REVIEW_BACKGROUND_SESSION:-not set}"
 
 git_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 git_commit="$(git rev-parse --short HEAD 2>/dev/null || true)"
@@ -65,7 +82,11 @@ else
 fi
 agy_command="agy --sandbox --new-project --print-timeout \"$timeout\" --log-file \"$log_file\" --model \"$model\" --print \"<prompt>\""
 
-user_prompt="$*"
+if [ -n "${AGY_REVIEW_PROMPT_FILE:-}" ]; then
+  user_prompt="$(cat "$AGY_REVIEW_PROMPT_FILE")"
+else
+  user_prompt="$*"
+fi
 prompt="$(printf '%s\n\n%s\n\n%s\n%s\n\n%s\n%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n' \
   "You are an independent reviewer. Review only; do not modify files." \
   "Task: $user_prompt" \
@@ -100,7 +121,25 @@ mkdir -p "$(dirname "$log_file")"
   echo "- TERM: $terminal_term"
   echo "- Proxy: $proxy_summary"
   echo "- NO_PROXY: $no_proxy_summary"
+  echo "- AGY path: $agy_path"
+  echo "- AGY version: $agy_version"
+  echo "- Background session: $background_session"
   echo "- AGY command: \`$agy_command\`"
+  echo
+  echo "## Startup Diagnostics"
+  echo
+  echo '```text'
+  echo "pwd=$PWD"
+  echo "agy_path=$agy_path"
+  echo "agy_version=$agy_version"
+  echo "term=$terminal_term"
+  echo "proxy=$proxy_summary"
+  echo "no_proxy=$no_proxy_summary"
+  echo "review_file=$review_file"
+  echo "log_file=$log_file"
+  echo "preflight_log_file=$preflight_log_file"
+  echo "background_session=$background_session"
+  echo '```'
   echo
   echo "## Prompt"
   echo
@@ -111,6 +150,46 @@ mkdir -p "$(dirname "$log_file")"
   echo "## Review"
   echo
 } > "$review_file"
+
+if [ "${AGY_REVIEW_PREFLIGHT:-false}" = "1" ] || [ "${AGY_REVIEW_PREFLIGHT:-false}" = "true" ]; then
+  preflight_timeout="${AGY_REVIEW_PREFLIGHT_TIMEOUT:-30s}"
+  preflight_prompt="${AGY_REVIEW_PREFLIGHT_PROMPT:-Smoke test for Antigravity review wrapper. Reply with one short sentence if authentication, proxy connectivity, and print mode work. Do not inspect files or modify anything.}"
+  {
+    echo "## Preflight"
+    echo
+    echo "- Timeout: $preflight_timeout"
+    echo "- Log: $preflight_log_file"
+    echo
+  } >> "$review_file"
+
+  set +e
+  agy \
+    --sandbox \
+    --new-project \
+    --print-timeout "$preflight_timeout" \
+    --log-file "$preflight_log_file" \
+    --model "$model" \
+    --print "$preflight_prompt" 2>&1 | tee -a "$review_file" "$preflight_output"
+  preflight_status="${PIPESTATUS[0]}"
+  set -e
+
+  {
+    echo
+    echo "- Preflight status: $([ "$preflight_status" -eq 0 ] && echo success || echo failed)"
+    if [ "$preflight_status" -ne 0 ]; then
+      echo "- Exit code: $preflight_status"
+    fi
+    echo
+  } >> "$review_file"
+
+  if [ "$preflight_status" -ne 0 ]; then
+    echo "Review preflight failed with exit code $preflight_status. Output written to: $review_file" >&2
+    sed -i.bak 's/^- Status: running$/- Status: failed/' "$review_file"
+    rm -f "$review_file.bak"
+    rm -f "$preflight_output"
+    exit "$preflight_status"
+  fi
+fi
 
 set +e
 agy \
@@ -163,5 +242,6 @@ else
 fi
 rm -f "$review_file.bak"
 rm -f "$output_capture"
+rm -f "$preflight_output"
 
 exit "$status"
