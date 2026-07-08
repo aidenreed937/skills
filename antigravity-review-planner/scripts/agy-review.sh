@@ -33,6 +33,7 @@ output_capture="$log_dir/agy-review-${project_name}-${timestamp}-$$.out.tmp"
 preflight_output="$log_dir/agy-review-${project_name}-${timestamp}-$$.preflight.out.tmp"
 preflight_log_file="${AGY_REVIEW_PREFLIGHT_LOG:-$log_dir/agy-review-${project_name}-${timestamp}-$$.preflight.log}"
 codegraph_used="${AGY_REVIEW_CODEGRAPH:-not checked}"
+use_codegraph="${AGY_REVIEW_USE_CODEGRAPH:-1}"
 if [ -n "${AGY_REVIEW_TARGET_FILES_FILE:-}" ]; then
   target_files="$(cat "$AGY_REVIEW_TARGET_FILES_FILE")"
 else
@@ -73,8 +74,13 @@ if [ -n "${AGY_REVIEW_PROMPT_FILE:-}" ]; then
 else
   user_prompt="$*"
 fi
+if [ "$use_codegraph" = "1" ] || [ "$use_codegraph" = "true" ]; then
+  tool_instruction="You are an independent reviewer. Review only; do not modify files. If codegraph MCP tools are available, first use codegraph_status for this project and then codegraph_explore on the requested task or target files before making [verified] claims. For refactor or architecture risk, use codegraph_impact on the main symbol when relevant. If codegraph is unavailable or unindexed, say so and fall back to read-only file inspection or the provided context."
+else
+  tool_instruction="You are an independent reviewer. Review only; do not modify files. Do not use codegraph MCP for this run; rely on read-only file inspection or the provided context."
+fi
 prompt="$(printf '%s\n\n%s\n\n%s\n%s\n\n%s\n%s\n\n%s\n%s\n%s\n%s\n%s\n%s\n' \
-  "You are an independent reviewer. Review only; do not modify files." \
+  "$tool_instruction" \
   "Task: $user_prompt" \
   "Known local context:" \
   "${local_context:-not provided}" \
@@ -117,6 +123,7 @@ update_review_status() {
   echo "- Git commit: $git_commit"
   echo "- Git dirty: $git_dirty"
   echo "- Codegraph: $codegraph_used"
+  echo "- Codegraph requested: $use_codegraph"
   echo "- Target files: $target_files"
   echo "- TERM: $terminal_term"
   echo "- Proxy: $proxy_summary"
@@ -139,6 +146,7 @@ update_review_status() {
   echo "log_file=$log_file"
   echo "preflight_log_file=$preflight_log_file"
   echo "background_session=$background_session"
+  echo "use_codegraph=$use_codegraph"
   echo '```'
   echo
   echo "## Prompt"

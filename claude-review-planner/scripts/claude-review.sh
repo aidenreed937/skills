@@ -25,15 +25,17 @@ fi
 model="${CLAUDE_REVIEW_MODEL-}"
 fallback_model="${CLAUDE_REVIEW_FALLBACK_MODEL-}"
 permission_mode="${CLAUDE_REVIEW_PERMISSION_MODE:-plan}"
-tools="${CLAUDE_REVIEW_TOOLS-}"
-tools_configured="false"
+default_allowed_tools="Read,Grep,Glob,mcp__codegraph__status,mcp__codegraph__explore,mcp__codegraph__impact,mcp__codegraph__files"
+tools="$default_allowed_tools"
+tools_source="default"
 if [ "${CLAUDE_REVIEW_TOOLS+x}" = "x" ]; then
-  tools_configured="true"
+  tools="${CLAUDE_REVIEW_TOOLS}"
+  tools_source="explicit"
 fi
 default_disallowed_tools="Bash,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch,Task"
 if [ "${CLAUDE_REVIEW_DISALLOWED_TOOLS+x}" = "x" ]; then
   disallowed_tools="${CLAUDE_REVIEW_DISALLOWED_TOOLS}"
-elif [ "$tools_configured" = "false" ] || [ -z "$tools" ]; then
+elif [ -z "$tools" ]; then
   disallowed_tools="$default_disallowed_tools"
 else
   disallowed_tools=""
@@ -86,9 +88,9 @@ if [ -n "${CLAUDE_REVIEW_PROMPT_FILE:-}" ]; then
 else
   user_prompt="$*"
 fi
-if [ "$tools_configured" = "true" ] && [ -n "$tools" ]; then
-  tool_instruction="You are an independent reviewer. Review only; do not modify files. If you inspect files, use only explicitly allowed read-only tools."
-elif [ "$tools_configured" = "true" ]; then
+if [ -n "$tools" ]; then
+  tool_instruction="You are an independent reviewer. Review only; do not modify files. Use the explicitly allowed read-only tools to inspect the provided target files before labeling source claims as [verified]."
+elif [ "$tools_source" = "explicit" ]; then
   tool_instruction="You are an independent reviewer. Review only; do not modify files or run tools. No tools are allowed for this run."
 else
   tool_instruction="You are an independent reviewer. Review only; do not modify files or run tools. Base the review on the provided local context."
@@ -133,7 +135,7 @@ if [ -n "$add_dirs" ]; then
   done
   IFS="$old_ifs"
 fi
-if [ "$tools_configured" = "true" ] && [ -n "$tools" ]; then
+if [ -n "$tools" ]; then
   cmd+=("--allowedTools=$tools")
 fi
 if [ -n "$disallowed_tools" ]; then
@@ -160,7 +162,7 @@ fi
 if [ -n "$add_dirs" ]; then
   claude_command="$claude_command --add-dir \"<configured>\""
 fi
-if [ "$tools_configured" = "true" ] && [ -n "$tools" ]; then
+if [ -n "$tools" ]; then
   claude_command="$claude_command --allowedTools=\"$tools\""
 fi
 if [ -n "$disallowed_tools" ]; then

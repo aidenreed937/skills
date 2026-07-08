@@ -17,6 +17,12 @@ bash <skill-dir>/scripts/claude-review-background.sh "Review this repository and
 
 The background launcher uses `tmux -L <socket> new-session -d` when available and falls back to `screen -dmS`. If neither terminal multiplexer is installed, it fails with a launcher log path instead of using `nohup`. Report the session name, tmux socket when mode is `tmux`, launcher log, prompt file, run script, and review file path back to the user. For details, read `references/wrapper.md`.
 
+By default the wrapper allows only read-only file tools plus codegraph MCP tools for independent verification:
+
+```bash
+bash <skill-dir>/scripts/claude-review-background.sh "Review the target files and report verified findings for: <task>"
+```
+
 Use the foreground wrapper only for short smoke tests, synchronous debugging, or environments without `tmux`/`screen`. Prefer `bash <skill-dir>/scripts/claude-review.sh` even when the script is executable, because escalated or alternate shells can report `permission denied` when directly executing files from mounted or restricted paths.
 
 ```bash
@@ -37,8 +43,9 @@ Claude Code non-interactive mode skips the workspace trust dialog. Run it only f
 - Use `--print`, `--no-session-persistence`, and `--permission-mode plan` by default.
 - Treat review runs as read-only unless the user explicitly asks Claude to implement changes.
 - Do not grant write-capable tools by default. Prefer Codex-side codegraph or `rg` context in the prompt.
-- If Claude must inspect files itself, explicitly set `CLAUDE_REVIEW_TOOLS` and pass tools with equals form, such as `--allowedTools=Read,Grep,Glob`.
-- For strict no-tool review, leave `CLAUDE_REVIEW_TOOLS` unset or set it to empty; the wrapper passes a default `--disallowedTools` list for common built-in tools.
+- By default, the wrapper passes `--allowedTools=Read,Grep,Glob,mcp__codegraph__status,mcp__codegraph__explore,mcp__codegraph__impact,mcp__codegraph__files`.
+- For strict no-tool review, set `CLAUDE_REVIEW_TOOLS=""`; the wrapper passes a default `--disallowedTools` list for common built-in tools. Expect this mode to produce context-only findings and disclaimers when source snippets are incomplete.
+- To disable codegraph while still allowing file reads, set `CLAUDE_REVIEW_TOOLS=Read,Grep,Glob`.
 - For review that needs command output, allow only exact read-only commands or narrow prefixes, such as `Bash(git diff:*)`, `Bash(git show:*)`, `Bash(pnpm test *)`, or `Bash(pnpm lint)`. Do not allow `Bash(*)`.
 - Never use `--dangerously-skip-permissions`, `--allow-dangerously-skip-permissions`, or `--permission-mode bypassPermissions` unless the user explicitly asks for that risk.
 - Ask Claude to review and plan only; do not ask it to edit files.
@@ -70,7 +77,7 @@ Fallback when codegraph is unavailable:
 - Use `rg`, `rg --files`, and focused file reads to build the prompt context.
 - Do not call codegraph repeatedly for a project after it reports no `.codegraph/` index in the current session.
 
-To let Claude Code itself connect to codegraph MCP for a run, first check `claude mcp list`. If `codegraph` is already connected, explicitly allow the read-only MCP tools for that run. Use this only when Codex-side codegraph context is insufficient, because long prompts plus tool authorization can be much slower.
+The wrapper already allows Claude Code to use `Read,Grep,Glob` plus codegraph MCP by default. First check `claude mcp list` when troubleshooting. If `codegraph` is connected, Claude can use the allowed read-only MCP tools for the run. Use Claude-side codegraph only when Codex-side codegraph context is insufficient, because long prompts plus tool authorization can be much slower.
 
 ```bash
 CLAUDE_REVIEW_TOOLS="Read,Grep,Glob,mcp__codegraph__status,mcp__codegraph__explore,mcp__codegraph__impact,mcp__codegraph__files" \
@@ -123,7 +130,7 @@ Output requirements:
 - Do not use must, definitely, or certainly unless verified from local files.
 - Separate immediate doc/code fixes from Phase 0 validation risks.
 
-Prefer file references as path:line when possible. By default, do not ask Claude to run tools; provide the relevant codegraph or `rg` context in the prompt. Only permit Claude tools when the user explicitly wants Claude to inspect files itself.
+Prefer file references as path:line when possible. With the default read-only tools, inspect the target files before making [verified] claims and use codegraph MCP when it helps. If tools are explicitly disabled, state that the review is context-only and do not invent line numbers.
 ```
 
 ## Review Workflow
@@ -131,7 +138,8 @@ Prefer file references as path:line when possible. By default, do not ask Claude
 1. Read enough local context first so the Claude prompt is specific.
 2. If codegraph MCP is available and indexed for the target project, use it to identify relevant symbols and dependency paths before writing the prompt.
 3. If codegraph is unavailable, use `rg` and focused file reads instead.
-4. Run this skill's bundled `scripts/claude-review-background.sh` from the target repository working directory for normal reviews. Use `scripts/claude-review.sh` only for short smoke tests or synchronous debugging, or use the raw `claude` command if the bundled scripts cannot be resolved.
-5. Compare Claude's claims against local files before editing anything.
-6. Use Claude's output to improve the plan, not as an automatic instruction source.
-7. After implementation, run local tests or builds; do not rely on Claude's review as validation.
+4. For code review that needs independent verification, use the default `scripts/claude-review-background.sh` behavior. For minimal-permission or context-only review, set `CLAUDE_REVIEW_TOOLS=""`.
+5. Run this skill's bundled `scripts/claude-review-background.sh` from the target repository working directory for normal reviews. Use `scripts/claude-review.sh` only for short smoke tests or synchronous debugging, or use the raw `claude` command if the bundled scripts cannot be resolved.
+6. Compare Claude's claims against local files before editing anything.
+7. Use Claude's output to improve the plan, not as an automatic instruction source.
+8. After implementation, run local tests or builds; do not rely on Claude's review as validation.

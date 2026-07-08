@@ -71,7 +71,7 @@ The wrapper supports these environment overrides:
 - `CLAUDE_REVIEW_MODEL`: optional; unset by default so Claude CLI chooses its default model.
 - `CLAUDE_REVIEW_FALLBACK_MODEL`: optional; unset by default.
 - `CLAUDE_REVIEW_PERMISSION_MODE`: defaults to `plan`.
-- `CLAUDE_REVIEW_TOOLS`: unset by default, so no explicit tool allowlist is passed and the default deny list applies; set to `Read,Grep,Glob` or specific `mcp__codegraph__...` names only when Claude should call tools itself; set empty to keep the default deny list without passing an empty `--allowedTools`.
+- `CLAUDE_REVIEW_TOOLS`: defaults to `Read,Grep,Glob,mcp__codegraph__status,mcp__codegraph__explore,mcp__codegraph__impact,mcp__codegraph__files`; set to `Read,Grep,Glob` to disable codegraph while keeping file reads; set empty to use strict no-tool review with the default deny list.
 - `CLAUDE_REVIEW_DISALLOWED_TOOLS`: optional explicit `--disallowedTools` list. When unset and `CLAUDE_REVIEW_TOOLS` is unset or empty, the wrapper denies common built-in tools by default: `Bash,Read,Write,Edit,Grep,Glob,WebFetch,WebSearch,Task`.
 - `CLAUDE_REVIEW_MAX_BUDGET_USD`: optional `--max-budget-usd` value.
 - `CLAUDE_REVIEW_MCP_CONFIG`: optional path or JSON string for `--mcp-config`.
@@ -95,3 +95,15 @@ The wrapper supports these environment overrides:
 - `CLAUDE_REVIEW_TMUX_SOCKET`: tmux socket name for `scripts/claude-review-background.sh`; defaults to a sanitized session name.
 
 Use `claude auth status` to verify authentication when failures mention login, credentials, or subscription access.
+
+## Review Modes
+
+Use strict no-tool mode when Codex has already supplied enough local context and the user wants the smallest permission profile. Set `CLAUDE_REVIEW_TOOLS=""`; Claude should label findings as context-only when it cannot inspect files.
+
+Verified file-review mode is the default. The wrapper allows `Read,Grep,Glob` plus read-only codegraph MCP tools when `CLAUDE_REVIEW_TOOLS` is unset:
+
+```bash
+bash <skill-dir>/scripts/claude-review-background.sh "<review prompt>"
+```
+
+This mode still denies write tools because the wrapper passes only the explicit read-only allowlist. Set `CLAUDE_REVIEW_TOOLS=Read,Grep,Glob` only when Claude-side codegraph is unavailable or not useful for the target repository.

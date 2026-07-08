@@ -10,7 +10,16 @@ Use for independent code review, risk review, architecture critique, or implemen
 bash <skill-dir>/scripts/claude-review.sh "<review prompt with Codex-gathered context>"
 ```
 
-If Claude needs to inspect the repository directly, keep it file-read only:
+By default, the wrapper allows `Read,Grep,Glob` plus read-only codegraph MCP tools so Claude can independently verify source claims.
+
+For strict no-tool context-only review, set `CLAUDE_REVIEW_TOOLS` to an empty value:
+
+```bash
+CLAUDE_REVIEW_TOOLS="" \
+  bash <skill-dir>/scripts/claude-review.sh "<review prompt>"
+```
+
+If Claude-side codegraph is unavailable or not useful for the target repository, keep direct file reads only:
 
 ```bash
 CLAUDE_REVIEW_TOOLS="Read,Grep,Glob" \
@@ -72,7 +81,7 @@ Relevant Claude Code CLI capabilities:
 - MCP support: `--mcp-config <config>` loads MCP servers; `--strict-mcp-config` ignores other MCP configs.
 - Session hygiene: `--no-session-persistence` prevents saving the review session.
 
-Prefer `plan` permission mode. Leave `CLAUDE_REVIEW_TOOLS` unset for strict no-tool review, or pass narrow read-only tool lists with the equals form only when needed, such as `--allowedTools=Read,Grep,Glob`. The space-separated form is variadic and can consume the final prompt. Put other variable-length options such as `--add-dir` before a later fixed option such as `--permission-mode "$mode"`.
+Prefer `plan` permission mode. The wrapper defaults to a narrow read-only allowlist. Set `CLAUDE_REVIEW_TOOLS=""` for strict no-tool review, or pass a custom narrow read-only tool list with the equals form when needed, such as `--allowedTools=Read,Grep,Glob`. The space-separated form is variadic and can consume the final prompt. Put other variable-length options such as `--add-dir` before a later fixed option such as `--permission-mode "$mode"`.
 
 ## Implementation Or Fix Mode
 

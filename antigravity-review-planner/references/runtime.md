@@ -4,11 +4,12 @@ Read this when using proxy/preflight/background mode, setting wrapper environmen
 
 ## Proxy And Preflight
 
-For Codex managed sandbox on macOS with a local proxy, prefer an explicit proxy preflight before a longer review:
+For Codex managed sandbox on macOS, prefer an explicit local proxy preflight before a longer review. A first preflight without proxy can time out during OAuth or userinfo calls; start with this standard proxy profile unless the environment is already proven:
 
 ```bash
 HTTP_PROXY=http://127.0.0.1:7897 \
 HTTPS_PROXY=http://127.0.0.1:7897 \
+ALL_PROXY=socks5://127.0.0.1:7897 \
 NO_PROXY=localhost,127.0.0.1,::1 \
 AGY_REVIEW_PREFLIGHT=1 \
 AGY_REVIEW_PREFLIGHT_TIMEOUT=30s \
@@ -24,6 +25,7 @@ For normal review runs, prefer the background launcher instead of blocking the c
 ```bash
 HTTP_PROXY=http://127.0.0.1:7897 \
 HTTPS_PROXY=http://127.0.0.1:7897 \
+ALL_PROXY=socks5://127.0.0.1:7897 \
 NO_PROXY=localhost,127.0.0.1,::1 \
 bash <skill-dir>/scripts/agy-review-background.sh "Review this repository and propose an implementation plan for: <task>"
 ```
@@ -54,6 +56,28 @@ Review files include:
 
 Use `--new-project` for every review run so unrelated project reviews do not reuse recent Antigravity conversation state.
 
+## Codegraph MCP
+
+AGY discovers MCP servers from `~/.gemini/config/mcp_config.json` or enabled plugin `mcp_config.json` files. It does not expose Claude-style `--mcp-config` or `--allowedTools` CLI flags.
+
+Expected global codegraph shape:
+
+```json
+{
+  "mcpServers": {
+    "codegraph": {
+      "command": "codegraph",
+      "args": ["serve", "--mcp"],
+      "env": {
+        "CODEGRAPH_MCP_TOOLS": "explore,node,search,callers,callees,impact,files,status"
+      }
+    }
+  }
+}
+```
+
+The review wrapper sets `AGY_REVIEW_USE_CODEGRAPH=1` by default in the prompt, asking AGY to call `codegraph_status`, then `codegraph_explore`, and `codegraph_impact` when relevant. Set `AGY_REVIEW_USE_CODEGRAPH=0` to disable this prompt guidance for a run.
+
 ## Configuration
 
 The wrapper supports these environment overrides:
@@ -65,6 +89,7 @@ The wrapper supports these environment overrides:
 - `AGY_REVIEW_FILE`: overrides the Markdown output file path.
 - `AGY_REVIEW_LOG`: overrides the log file path.
 - `AGY_REVIEW_CODEGRAPH`: records codegraph state in the review file, such as `used`, `unavailable`, or `not checked`.
+- `AGY_REVIEW_USE_CODEGRAPH`: defaults to `1`; instructs AGY to use codegraph MCP first when available. Set `0` to disable.
 - `AGY_REVIEW_CONTEXT`: adds concise local context gathered from codegraph or `rg` into the wrapped prompt.
 - `AGY_REVIEW_TARGET_FILES`: records the reviewed file list in the review file and wrapped prompt.
 - `AGY_REVIEW_PROMPT_FILE`: reads the user task prompt from a file instead of positional shell arguments.
