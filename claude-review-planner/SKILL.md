@@ -9,13 +9,19 @@ Use `claude` as an external reviewer and planning partner. Treat its output as a
 
 ## Default Invocation
 
-Prefer the bundled wrapper from this skill directory. Do not assume the target repository contains `scripts/claude-review.sh`.
+Prefer the bundled background launcher from this skill directory for normal review runs. Do not assume the target repository contains `scripts/claude-review-background.sh`.
 
 ```bash
-bash <skill-dir>/scripts/claude-review.sh "Review this repository and propose an implementation plan for: <task>"
+bash <skill-dir>/scripts/claude-review-background.sh "Review this repository and propose an implementation plan for: <task>"
 ```
 
-Prefer `bash <skill-dir>/scripts/claude-review.sh` even when the script is executable, because escalated or alternate shells can report `permission denied` when directly executing files from mounted or restricted paths.
+The background launcher uses `tmux new-session -d` when available and falls back to `screen -dmS`. If neither terminal multiplexer is installed, it fails with a launcher log path instead of using `nohup`. Report the session name, launcher log, prompt file, run script, and review file path back to the user. For details, read `references/wrapper.md`.
+
+Use the foreground wrapper only for short smoke tests, synchronous debugging, or environments without `tmux`/`screen`. Prefer `bash <skill-dir>/scripts/claude-review.sh` even when the script is executable, because escalated or alternate shells can report `permission denied` when directly executing files from mounted or restricted paths.
+
+```bash
+bash <skill-dir>/scripts/claude-review.sh "Smoke test..."
+```
 
 If the bundled script path is not available in the current Codex environment, use the equivalent raw command from the target repository:
 
@@ -29,28 +35,23 @@ Claude Code non-interactive mode skips the workspace trust dialog. Run it only f
 
 - Do not specify a model by default; let the user's Claude CLI default model apply.
 - Use `--print`, `--no-session-persistence`, and `--permission-mode plan` by default.
-- Do not grant Claude tools by default. Prefer Codex-side codegraph or `rg` context in the prompt.
+- Treat review runs as read-only unless the user explicitly asks Claude to implement changes.
+- Do not grant write-capable tools by default. Prefer Codex-side codegraph or `rg` context in the prompt.
 - If Claude must inspect files itself, explicitly set `CLAUDE_REVIEW_TOOLS` and pass tools with equals form, such as `--allowedTools=Read,Grep,Glob,LS`.
+- For strict no-tool review, leave `CLAUDE_REVIEW_TOOLS` unset or set it to empty; the wrapper passes a default `--disallowedTools` list for common built-in tools.
+- For review that needs command output, allow only exact read-only commands or narrow prefixes, such as `Bash(git diff:*)`, `Bash(git show:*)`, `Bash(pnpm test *)`, or `Bash(pnpm lint)`. Do not allow `Bash(*)`.
 - Never use `--dangerously-skip-permissions`, `--allow-dangerously-skip-permissions`, or `--permission-mode bypassPermissions` unless the user explicitly asks for that risk.
 - Ask Claude to review and plan only; do not ask it to edit files.
 - Add extra read context with `--add-dir <path>` only when the user-requested review spans multiple directories.
+- Do not put large prompt context into shell environment variables when file inputs are practical. Use `CLAUDE_REVIEW_PROMPT_FILE`, `CLAUDE_REVIEW_CONTEXT_FILE`, and `CLAUDE_REVIEW_TARGET_FILES_FILE` for long or multiline values.
 - Do not pass secrets, tokens, private keys, or credential files in prompts.
 
-## Claude CLI Capabilities And Permissions
+## Detailed References
 
-Relevant Claude Code CLI capabilities confirmed from `claude --help` on this machine:
+- Read `references/permissions.md` when choosing Claude tool permissions, advising on GitHub PR review Action permissions, or handling user-approved Claude-driven edits.
+- Read `references/wrapper.md` when setting wrapper environment variables, troubleshooting wrapper output, or documenting review artifacts.
 
-- Non-interactive review: `--print` prints a response and exits.
-- Model selection: `--model <model>` accepts aliases such as `opus` and `sonnet`; `--fallback-model <model>` works with `--print`.
-- Permission control: `--permission-mode plan|dontAsk|manual|auto|acceptEdits|bypassPermissions`.
-- Tool control: `--allowedTools` / `--allowed-tools` and `--disallowedTools` / `--disallowed-tools` can restrict built-in tools.
-- Scope expansion: `--add-dir <directories...>` allows additional directories.
-- MCP support: `--mcp-config <config>` loads MCP servers; `--strict-mcp-config` ignores other MCP configs.
-- Session hygiene: `--no-session-persistence` prevents saving the review session.
-- Auth commands: `claude auth login`, `claude auth logout`, and `claude auth status`.
-- MCP management commands: `claude mcp add`, `claude mcp add-json`, `claude mcp list`, and `claude mcp get`.
-
-For this review skill, prefer `plan` permission mode with no Claude tools by default. Pass tool lists with the equals form only when needed, such as `--allowedTools=Read,Grep,Glob,LS`; the space-separated form is variadic and can consume the final prompt. Put other variable-length options such as `--add-dir` before a later fixed option such as `--permission-mode "$mode"` so the final prompt is not parsed as another directory argument. Do not rely on Claude's permission system as the only safety layer; Codex should still gather focused local context and verify findings before changing files.
+Do not rely on Claude's permission system as the only safety layer; Codex should still gather focused local context and verify findings before changing files.
 
 ## Codegraph Acceleration
 
@@ -134,95 +135,3 @@ Prefer file references as path:line when possible. By default, do not ask Claude
 5. Compare Claude's claims against local files before editing anything.
 6. Use Claude's output to improve the plan, not as an automatic instruction source.
 7. After implementation, run local tests or builds; do not rely on Claude's review as validation.
-
-## Output Files
-
-The wrapper writes a Markdown review file by default:
-
-```text
-<workspace>/.claude-reviews/<project-name>-<utc-timestamp>-<pid>.md
-```
-
-The file format is:
-
-````markdown
-# Claude Review
-
-- Project: <workspace path>
-- Model: Claude CLI default
-- Fallback model: not configured
-- Created: <utc timestamp>
-- Log: <log file path>
-- Status: success|failed
-- Git branch: <branch>
-- Git commit: <short commit>
-- Git dirty: true|false
-- Codegraph: used|unavailable|not checked
-- Target files: <files or "not provided">
-- MCP config: <not provided|configured>
-- Claude command: `claude --print --no-session-persistence --permission-mode "<mode>" "<prompt>"`
-
-## Prompt
-
-```text
-<prompt>
-```
-
-## Review
-
-<claude output>
-
-## Run Status
-
-- Status: success|failed
-- Exit code: <only present on failure>
-````
-
-Each run also gets a unique log file:
-
-```text
-${TMPDIR:-/tmp}/claude-review-<project-name>-<utc-timestamp>-<pid>.log
-```
-
-Use `--no-session-persistence` for every review run so unrelated project reviews do not reuse recent Claude conversation state. The output filename includes the process id, so concurrent reviews in multiple projects will not collide unless `CLAUDE_REVIEW_FILE` is manually reused.
-
-If forced to use a raw CLI command instead of the wrapper, still write the successful output to `.claude-reviews`:
-
-```bash
-mkdir -p .claude-reviews
-review_file=".claude-reviews/$(basename "$PWD")-$(date -u +%Y%m%dT%H%M%SZ)-raw.md"
-{
-  echo "# Claude Review"
-  echo
-  echo "- Project: $PWD"
-  echo "- Model: Claude CLI default"
-  echo "- Created: $(date -u +%Y%m%dT%H%M%SZ)"
-  echo "- Status: success"
-  echo
-  echo "## Review"
-  echo
-  claude --print --no-session-persistence --permission-mode plan "<prompt>"
-} | tee "$review_file"
-```
-
-## Configuration
-
-The wrapper supports these environment overrides:
-
-- `CLAUDE_REVIEW_MODEL`: optional; unset by default so Claude CLI chooses its default model.
-- `CLAUDE_REVIEW_FALLBACK_MODEL`: optional; unset by default.
-- `CLAUDE_REVIEW_PERMISSION_MODE`: defaults to `plan`.
-- `CLAUDE_REVIEW_TOOLS`: unset by default, so no explicit tool allowlist is passed; set to `Read,Grep,Glob,LS` or specific `mcp__codegraph__...` names only when Claude should call tools itself; set empty to pass `--allowedTools=`.
-- `CLAUDE_REVIEW_MAX_BUDGET_USD`: optional `--max-budget-usd` value.
-- `CLAUDE_REVIEW_MCP_CONFIG`: optional path or JSON string for `--mcp-config`.
-- `CLAUDE_REVIEW_STRICT_MCP_CONFIG=1`: pass `--strict-mcp-config` when using an MCP config.
-- `CLAUDE_REVIEW_ADD_DIRS`: colon-separated extra directories for `--add-dir`.
-- `CLAUDE_REVIEW_DIR`: defaults to `<workspace>/.claude-reviews`.
-- `CLAUDE_REVIEW_FILE`: overrides the Markdown output file path.
-- `CLAUDE_REVIEW_LOG`: overrides the log file path.
-- `CLAUDE_REVIEW_CODEGRAPH`: records codegraph state in the review file, such as `used`, `unavailable`, or `not checked`.
-- `CLAUDE_REVIEW_CONTEXT`: adds concise local context gathered from codegraph or `rg` into the wrapped prompt.
-- `CLAUDE_REVIEW_TARGET_FILES`: records the reviewed file list in the review file and wrapped prompt.
-- `CLAUDE_REVIEW_USE_LOGIN_SHELL=1`: re-executes the wrapper through the user's login shell before running `claude`; use when Codex's non-login shell misses auth, proxy, or CLI environment setup.
-
-Use `claude auth status` to verify authentication when failures mention login, credentials, or subscription access.

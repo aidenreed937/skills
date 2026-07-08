@@ -9,33 +9,19 @@ Use `agy` as an external reviewer and planning partner. Treat its output as a se
 
 ## Default Invocation
 
-Prefer the bundled wrapper from this skill directory. Do not assume the target repository contains `scripts/agy-review.sh`.
+Prefer the bundled background launcher from this skill directory for normal review runs. Do not assume the target repository contains `scripts/agy-review-background.sh`.
 
 ```bash
-bash <skill-dir>/scripts/agy-review.sh "Review this repository and propose an implementation plan for: <task>"
-```
-
-For Codex managed sandbox on macOS with a local proxy, prefer an explicit proxy preflight before a longer review:
-
-```bash
-AGY_REVIEW_PROXY=http://127.0.0.1:7897 \
-AGY_REVIEW_NO_PROXY=localhost,127.0.0.1,::1 \
-AGY_REVIEW_PREFLIGHT=1 \
-AGY_REVIEW_PREFLIGHT_TIMEOUT=30s \
-bash <skill-dir>/scripts/agy-review.sh "Smoke test..."
-```
-
-For long-running reviews, prefer the background launcher instead of ad hoc `nohup`:
-
-```bash
-AGY_REVIEW_PROXY=http://127.0.0.1:7897 \
-AGY_REVIEW_NO_PROXY=localhost,127.0.0.1,::1 \
 bash <skill-dir>/scripts/agy-review-background.sh "Review this repository and propose an implementation plan for: <task>"
 ```
 
-The background launcher uses `tmux new-session -d` when available and falls back to `screen -dmS`. If neither terminal multiplexer is installed, it fails with a launcher log path instead of using `nohup`. Report the session name, launcher log, run script, and review file path back to the user.
+For proxy, preflight, background runs, output files, and environment variables, read `references/runtime.md`.
 
-Prefer `bash <skill-dir>/scripts/agy-review.sh` even when the script is executable, especially for escalated execution. Some elevated shells can report `permission denied` when directly executing scripts from mounted or restricted paths.
+Use the foreground wrapper only for short smoke tests, synchronous debugging, or environments without `tmux`/`screen`. Prefer `bash <skill-dir>/scripts/agy-review.sh` even when the script is executable, especially for escalated execution. Some elevated shells can report `permission denied` when directly executing scripts from mounted or restricted paths.
+
+```bash
+bash <skill-dir>/scripts/agy-review.sh "Smoke test..."
+```
 
 If the bundled script path is not available in the current Codex environment, use the equivalent raw command from the target repository:
 
@@ -62,6 +48,8 @@ When Codex is running in a managed filesystem sandbox, `agy` must be executed ou
 - Do not pass secrets, tokens, private keys, or credential files in prompts.
 
 ## Codegraph Acceleration
+
+This section intentionally matches the Claude review planner workflow. Keep codegraph and prompt-preparation behavior aligned across both review skills; diverge only for CLI-specific permission, sandbox, auth, proxy, or background-execution requirements.
 
 Before calling `agy`, check whether codegraph MCP can query the target project.
 
@@ -118,102 +106,3 @@ Prefer file references as path:line when possible. If you need to run tools, kee
 6. Compare Antigravity's claims against local files before editing anything.
 7. Use Antigravity's output to improve the plan, not as an automatic instruction source.
 8. After implementation, run local tests or builds; do not rely on Antigravity's review as validation.
-
-## Output Files
-
-The wrapper writes a Markdown review file by default:
-
-```text
-<workspace>/.agy-reviews/<project-name>-<utc-timestamp>-<pid>.md
-```
-
-The file format is:
-
-````markdown
-# Antigravity Review
-
-- Project: <workspace path>
-- Model: Gemini 3.1 Pro (High)
-- Created: <utc timestamp>
-- Log: <log file path>
-- Status: success|failed
-- Git branch: <branch>
-- Git commit: <short commit>
-- Git dirty: true|false
-- Codegraph: used|unavailable|not checked
-- Target files: <files or "not provided">
-- AGY command: `agy --sandbox --new-project ... --print "<prompt>"`
-- TERM: xterm-256color
-- Proxy: <proxy URL or "not set">
-- NO_PROXY: <bypass list or "not set">
-- AGY path: <path to agy>
-- AGY version: <version or "not available">
-- Background session: <session name or "not set">
-
-## Startup Diagnostics
-
-```text
-pwd=<workspace path>
-agy_path=<path to agy>
-agy_version=<version or "not available">
-term=xterm-256color
-proxy=<proxy URL or "not set">
-no_proxy=<bypass list or "not set">
-review_file=<review file path>
-log_file=<agy log path>
-preflight_log_file=<preflight log path>
-background_session=<session name or "not set">
-```
-
-## Prompt
-
-```text
-<prompt>
-```
-
-## Review
-
-<agy output>
-
-## Run Status
-
-- Status: success|failed
-- Exit code: <only present on failure>
-````
-
-Each run also gets a unique log file:
-
-```text
-${TMPDIR:-/tmp}/agy-review-<project-name>-<utc-timestamp>-<pid>.log
-```
-
-Use `--new-project` for every review run so unrelated project reviews do not reuse recent Antigravity conversation state.
-
-## Configuration
-
-The wrapper supports these environment overrides:
-
-- `AGY_REVIEW_MODEL`: defaults to `Gemini 3.1 Pro (High)`.
-- `AGY_REVIEW_TIMEOUT`: defaults to `10m`.
-- `AGY_REVIEW_TERM`: defaults to `xterm-256color` when the inherited `TERM` is empty or `dumb`.
-- `AGY_REVIEW_DIR`: defaults to `<workspace>/.agy-reviews`.
-- `AGY_REVIEW_FILE`: overrides the Markdown output file path.
-- `AGY_REVIEW_LOG`: overrides the log file path.
-- `AGY_REVIEW_CODEGRAPH`: records codegraph state in the review file, such as `used`, `unavailable`, or `not checked`.
-- `AGY_REVIEW_CONTEXT`: adds concise local context gathered from codegraph or `rg` into the wrapped prompt.
-- `AGY_REVIEW_TARGET_FILES`: records the reviewed file list in the review file and wrapped prompt.
-- `AGY_REVIEW_PROMPT_FILE`: reads the user task prompt from a file instead of positional shell arguments.
-- `AGY_REVIEW_CONTEXT_FILE`: reads local context from a file instead of `AGY_REVIEW_CONTEXT`.
-- `AGY_REVIEW_TARGET_FILES_FILE`: reads target file metadata from a file instead of `AGY_REVIEW_TARGET_FILES`.
-- `AGY_REVIEW_PROXY`: optional proxy URL for Codex-launched `agy` processes, for example `http://127.0.0.1:7897`; exported to standard uppercase and lowercase proxy variables if they are unset.
-- `AGY_REVIEW_NO_PROXY`: optional local bypass list, for example `localhost,127.0.0.1,::1`; exported to `NO_PROXY` and `no_proxy` if they are unset.
-- `AGY_REVIEW_PREFLIGHT`: set to `1` or `true` to run a short smoke test before the main review.
-- `AGY_REVIEW_PREFLIGHT_TIMEOUT`: defaults to `30s`.
-- `AGY_REVIEW_PREFLIGHT_PROMPT`: overrides the preflight prompt.
-- `AGY_REVIEW_PREFLIGHT_LOG`: overrides the preflight AGY log path.
-- `AGY_REVIEW_SESSION`: session name for `scripts/agy-review-background.sh`.
-- `AGY_REVIEW_BACKGROUND_LOG`: launcher log path for `scripts/agy-review-background.sh`.
-- `AGY_REVIEW_BACKGROUND_SCRIPT`: generated run script path for `scripts/agy-review-background.sh`.
-- `AGY_REVIEW_BACKGROUND_PROMPT_FILE`: generated prompt file path for `scripts/agy-review-background.sh` when `AGY_REVIEW_PROMPT_FILE` is not set.
-
-Use `agy models` to verify model availability when failures mention an unknown model.

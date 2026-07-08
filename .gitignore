@@ -7,3 +7,7 @@
 
 # Local code intelligence index
 .codegraph/
+
+# Local review outputs
+.agy-reviews/
+.claude-reviews/

@@ -46,7 +46,7 @@ log_file="${AGY_REVIEW_LOG:-$log_dir/agy-review-${project_name}-${timestamp}-$$.
 output_capture="$log_dir/agy-review-${project_name}-${timestamp}-$$.out.tmp"
 preflight_output="$log_dir/agy-review-${project_name}-${timestamp}-$$.preflight.out.tmp"
 preflight_log_file="${AGY_REVIEW_PREFLIGHT_LOG:-$log_dir/agy-review-${project_name}-${timestamp}-$$.preflight.log}"
-codegraph_used="${AGY_REVIEW_CODEGRAPH:-unknown}"
+codegraph_used="${AGY_REVIEW_CODEGRAPH:-not checked}"
 if [ -n "${AGY_REVIEW_TARGET_FILES_FILE:-}" ]; then
   target_files="$(cat "$AGY_REVIEW_TARGET_FILES_FILE")"
 else

@@ -16,8 +16,9 @@ if ! command -v claude >/dev/null 2>&1; then
   exit 127
 fi
 
-if [ "$#" -eq 0 ]; then
+if [ "$#" -eq 0 ] && [ -z "${CLAUDE_REVIEW_PROMPT_FILE:-}" ]; then
   echo "Usage: $0 <review prompt> [additional prompt args...]" >&2
+  echo "       CLAUDE_REVIEW_PROMPT_FILE=/path/to/prompt.txt $0" >&2
   exit 64
 fi
 
@@ -28,6 +29,14 @@ tools="${CLAUDE_REVIEW_TOOLS-}"
 tools_configured="false"
 if [ "${CLAUDE_REVIEW_TOOLS+x}" = "x" ]; then
   tools_configured="true"
+fi
+default_disallowed_tools="Bash,Read,Write,Edit,MultiEdit,NotebookEdit,Grep,Glob,LS,WebFetch,WebSearch,Task"
+if [ "${CLAUDE_REVIEW_DISALLOWED_TOOLS+x}" = "x" ]; then
+  disallowed_tools="${CLAUDE_REVIEW_DISALLOWED_TOOLS}"
+elif [ "$tools_configured" = "false" ] || [ -z "$tools" ]; then
+  disallowed_tools="$default_disallowed_tools"
+else
+  disallowed_tools=""
 fi
 max_budget="${CLAUDE_REVIEW_MAX_BUDGET_USD:-}"
 mcp_config="${CLAUDE_REVIEW_MCP_CONFIG:-}"
@@ -46,8 +55,17 @@ log_dir="${log_dir%/}"
 log_file="${CLAUDE_REVIEW_LOG:-$log_dir/claude-review-${project_name}-${timestamp}-$$.log}"
 output_capture="$log_dir/claude-review-${project_name}-${timestamp}-$$.out.tmp"
 codegraph_used="${CLAUDE_REVIEW_CODEGRAPH:-not checked}"
-target_files="${CLAUDE_REVIEW_TARGET_FILES:-not provided}"
+if [ -n "${CLAUDE_REVIEW_TARGET_FILES_FILE:-}" ]; then
+  target_files="$(cat "$CLAUDE_REVIEW_TARGET_FILES_FILE")"
+else
+  target_files="${CLAUDE_REVIEW_TARGET_FILES:-not provided}"
+fi
+if [ -n "${CLAUDE_REVIEW_CONTEXT_FILE:-}" ]; then
+  local_context="$(cat "$CLAUDE_REVIEW_CONTEXT_FILE")"
+else
 local_context="${CLAUDE_REVIEW_CONTEXT:-}"
+fi
+background_session="${CLAUDE_REVIEW_BACKGROUND_SESSION:-not set}"
 
 git_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 git_commit="$(git rev-parse --short HEAD 2>/dev/null || true)"
@@ -63,7 +81,11 @@ else
   git_dirty="false"
 fi
 
-user_prompt="$*"
+if [ -n "${CLAUDE_REVIEW_PROMPT_FILE:-}" ]; then
+  user_prompt="$(cat "$CLAUDE_REVIEW_PROMPT_FILE")"
+else
+  user_prompt="$*"
+fi
 if [ "$tools_configured" = "true" ] && [ -n "$tools" ]; then
   tool_instruction="You are an independent reviewer. Review only; do not modify files. If you inspect files, use only explicitly allowed read-only tools."
 elif [ "$tools_configured" = "true" ]; then
@@ -111,8 +133,11 @@ if [ -n "$add_dirs" ]; then
   done
   IFS="$old_ifs"
 fi
-if [ "$tools_configured" = "true" ]; then
+if [ "$tools_configured" = "true" ] && [ -n "$tools" ]; then
   cmd+=("--allowedTools=$tools")
+fi
+if [ -n "$disallowed_tools" ]; then
+  cmd+=("--disallowedTools=$disallowed_tools")
 fi
 cmd+=(--permission-mode "$permission_mode")
 
@@ -135,8 +160,11 @@ fi
 if [ -n "$add_dirs" ]; then
   claude_command="$claude_command --add-dir \"<configured>\""
 fi
-if [ "$tools_configured" = "true" ]; then
+if [ "$tools_configured" = "true" ] && [ -n "$tools" ]; then
   claude_command="$claude_command --allowedTools=\"$tools\""
+fi
+if [ -n "$disallowed_tools" ]; then
+  claude_command="$claude_command --disallowedTools=\"$disallowed_tools\""
 fi
 claude_command="$claude_command --permission-mode \"$permission_mode\""
 claude_command="$claude_command \"<prompt>\""
@@ -164,6 +192,8 @@ mkdir -p "$(dirname "$log_file")"
   echo "- Codegraph: $codegraph_used"
   echo "- Target files: $target_files"
   echo "- MCP config: $mcp_status"
+  echo "- Disallowed tools: ${disallowed_tools:-not configured}"
+  echo "- Background session: $background_session"
   echo "- Claude command: \`$claude_command\`"
   echo
   echo "## Prompt"
