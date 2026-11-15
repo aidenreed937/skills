@@ -1,0 +1,8 @@
+{
+  "package": "zhihu-cli-skill",
+  "version": "0.7.5",
+  "url": "https://developer-cdn.zhihu.com/zhihu-cli/releases/stable/skill/0.7.5/zhihu-cli-skill-0.7.5.zip",
+  "sha256": "33c3925c0c3eb17a6365ca2a97365196a5078848e7e536eb89ae70916ec495f2",
+  "size": 107317,
+  "manifest_url": "https://developer-cdn.zhihu.com/zhihu-cli/releases/stable/manifest.json"
+}
